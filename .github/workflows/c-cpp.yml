@@ -27,4 +27,4 @@ jobs:
       run: sudo ./setup.sh
 
     - name: Build Gatekeeper
-      run: make
+      run: sudo make
