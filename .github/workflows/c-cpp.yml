@@ -1,4 +1,4 @@
-name: C/C++ CI
+name: compile
 
 on:
   push:
@@ -18,4 +18,4 @@ jobs:
     - run: sudo apt-get update
     - run: sudo apt-get -y -q install git clang devscripts doxygen hugepages build-essential linux-headers-`uname -r` libmnl0 libmnl-dev libkmod2 libkmod-dev libnuma-dev libelf1 libelf-dev libc6-dev-i386 autoconf flex bison libncurses5-dev libreadline-dev
     - name: setup
-      run: . setup.sh
+      run: sudo . setup.sh
