@@ -1,5 +1,7 @@
 # Gatekeeper
 
+<a href="https://github.com/cjdoucette/gatekeeper/actions?query=workflow%3compile"><img alt="Gatekeeper compilation status" src="https://github.com/cjdoucette/gatekeeper/workflows/compile/badge.svg"></a>
+
 ## What is Gatekeeper?
 
 Gatekeeper is the first open source DoS protection system. It is designed to
