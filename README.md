@@ -1,6 +1,9 @@
 # Gatekeeper
 
-<a href="https://github.com/cjdoucette/gatekeeper/actions?query=workflow%3compile"><img alt="Gatekeeper compilation status" src="https://github.com/cjdoucette/gatekeeper/workflows/compile/badge.svg"></a>
+<a href="https://github.com/AltraMayor/gatekeeper/actions?query=workflow%3compile">
+  <img alt="Gatekeeper compilation status"
+       src="https://github.com/AltraMayor/gatekeeper/workflows/compile/badge.svg">
+</a>
 
 ## What is Gatekeeper?
 
