@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      rte_sdk: format('{0}/{1}', ${{ github.workspace }}, 'dependencies/dpdk') 
+      rte_sdk: ${{ format('{0}/{1}', ${{ github.workspace }}, 'dependencies/dpdk') }}
       rte_target: ${{ 'x86_64-native-linuxapp-gcc' }}
 
     steps:
