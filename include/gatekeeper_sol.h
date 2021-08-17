@@ -162,6 +162,9 @@ struct sol_config {
 
 	struct sol_instance *instances;
 	struct net_config   *net;
+
+	/* Offset of priority field in dynamic memory of mbufs. */
+	int priority_offset;
 };
 
 struct sol_config *alloc_sol_conf(void);
@@ -176,5 +179,12 @@ sol_conf_hold(struct sol_config *sol_conf)
 }
 
 int sol_conf_put(struct sol_config *sol_conf);
+
+static inline void
+set_prio(struct sol_config *sol_conf, struct rte_mbuf *pkt, uint8_t priority)
+{
+	*RTE_MBUF_DYNFIELD(pkt, sol_conf->priority_offset, uint8_t *) =
+		priority;
+}
 
 #endif /* _GATEKEEPER_SOL_H_ */
