@@ -180,11 +180,11 @@ struct in6_addr {
 	unsigned char s6_addr[16];
 };
 
-struct rte_lpm {
+struct lpm_lua_userdata {
 	/* This struct has hidden fields. */
 };
 
-struct rte_lpm6 {
+struct lpm6_lua_userdata {
 	/* This struct has hidden fields. */
 };
 
