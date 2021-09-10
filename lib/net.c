@@ -95,125 +95,187 @@ randomize_rss_key(int guarantee_random_entropy)
 uint8_t rss_key_be[RTE_DIM(default_rss_key)];
 
 /*
- * @ether_type should be passed in host ordering, but is converted
- * to little endian ordering before being added as a filter. The
- * EType register's value should be in little endian, according to
- * the 82599 datasheet.
+ * Add a filter that steers packets to queues based on their EtherType.
  *
- * Does the endianness change with other NICs?
- * 	We have checked the source code of three DPDK networking drivers:
- *	i40e, ixgbe, e1000. And all of them use little endian order.
- *	However, we didn't find the parts for other drivers. We tried to
- *	ask help from the DPDK mailinglist, but didn't get reply.
+ * Tecnically, the DPDK rte_flow API allows filters to be specified
+ * on any field in an Ethernet header, but in practice, drivers implement
+ * the RTE_FLOW_ITEM_TYPE_ETH using the EtherType filters available
+ * in hardware. Typically, EtherType filters only support destination
+ * MAC addresses and the EtherType field. We choose to only allow
+ * the EtherType field to be specified, since the destination MAC
+ * address may be extraneous anyway (#74).
+ *
+ * @ether_type should be passed in host ordering, but is converted
+ * to big endian ordering before being added as a filter, as
+ * required by the rte_flow API. Individual device drivers can then
+ * convert it to whatever endianness is needed.
  */
 int
-ethertype_filter_add(struct gatekeeper_if *iface, uint16_t ether_type,
+ethertype_flow_add(struct gatekeeper_if *iface, uint16_t ether_type,
 	uint16_t queue_id)
 {
-	struct rte_eth_ethertype_filter filter = {
-		.ether_type = rte_cpu_to_le_16(ether_type),
-		.flags = 0,
-		.queue = queue_id,
-	};
-	unsigned int i;
+	struct rte_flow_attr attr;
+	struct rte_flow_item pattern[2];
+	struct rte_flow_action action[2];
+	struct rte_flow *flows[iface->num_ports];
+	struct rte_flow_action_queue queue = { .index = queue_id };
+	struct rte_flow_item_eth eth_spec;
+	struct rte_flow_item_eth eth_mask;
+	struct rte_flow_error error;
+	struct rte_flow *flow;
 	int ret;
 
-	RTE_VERIFY(iface->hw_filter_eth);
-
-	for (i = 0; i < iface->num_ports; i++) {
-		uint16_t port_id = iface->ports[i];
-		ret = rte_eth_dev_filter_ctrl(port_id,
-			RTE_ETH_FILTER_ETHERTYPE,
-			RTE_ETH_FILTER_ADD,
-			&filter);
-		if (ret == -ENOTSUP) {
-			G_LOG(NOTICE,
-				"net: hardware doesn't support adding an EtherType filter for 0x%02hx on port %hhu\n",
-				ether_type, port_id);
-			ret = -1;
-			goto out;
-		} else if (ret == -ENODEV) {
-			G_LOG(NOTICE,
-				"net: port %hhu is invalid for adding an EtherType filter for 0x%02hx\n",
-				port_id, ether_type);
-			ret = -1;
-			goto out;
-		} else if (ret != 0) {
-			G_LOG(NOTICE,
-				"net: other errors that depend on the specific operations implementation on port %hhu for adding an EtherType filter for 0x%02hx\n",
-				port_id, ether_type);
-			ret = -1;
-			goto out;
-		}
+	if (!iface->rss) {
+		/*
+		 * If RSS is not supported, then data plane packets
+		 * could be assigned to RX queues that are serviced
+		 * by non-data plane blocks (e.g., LLS).
+		 */
+		G_LOG(NOTICE, "net: cannot use EtherType filters when RSS is not supported\n");
+		return -1;
 	}
 
-	ret = 0;
+	memset(&attr, 0, sizeof(struct rte_flow_attr));
+	attr.ingress = 1;
 
-out:
-	return ret;
-}
+	memset(action, 0, sizeof(action));
+	action[0].type = RTE_FLOW_ACTION_TYPE_QUEUE;
+	action[0].conf = &queue;
+	action[1].type = RTE_FLOW_ACTION_TYPE_END;
 
-/*
- * ntuple filters can only be used if supported by the NIC
- * (to steer matching packets) and if RSS is supported
- * (to steer non-matching packets elsewhere).
- */
-static inline bool
-hw_filter_ntuple_available(const struct gatekeeper_if *iface)
-{
-	return iface->hw_filter_ntuple && iface->rss;
+	memset(pattern, 0, sizeof(pattern));
+	pattern[0].type = RTE_FLOW_ITEM_TYPE_ETH;
+	memset(&eth_spec, 0, sizeof(struct rte_flow_item_eth));
+	memset(&eth_mask, 0, sizeof(struct rte_flow_item_eth));
+	eth_spec.type = rte_cpu_to_be_16(ether_type);
+	eth_mask.type = 0xFFFF;
+	pattern[0].spec = &eth_spec;
+	pattern[0].mask = &eth_mask;
+	pattern[1].type = RTE_FLOW_ITEM_TYPE_END;
+
+	ret = rte_flow_validate(iface->id, &attr, pattern, action, &error);
+	if (ret < 0) {
+		/*
+		 * A negative errno value was returned
+		 * (and also put in rte_errno).
+		 */
+		G_LOG(NOTICE, "net: could not validate EtherType flow: %s (%s)\n",
+			strerror(-ret), error.message);
+		return -1;
+	}
+
+	flow = rte_flow_create(iface->id, &attr, pattern, action, &error);
+	if (flow == NULL) {
+		/* rte_errno is set to a positive errno value. */
+		G_LOG(NOTICE, "net: could not create EtherType flow: %s (%s)\n",
+			strerror(rte_errno), error.message);
+		return -1;
+	}
+
+	return 0;
 }
 
 static int
-ipv4_ntuple_filter_add(struct gatekeeper_if *iface, rte_be32_t dst_ip_be,
+ipv4_flow_add(struct gatekeeper_if *iface, rte_be32_t dst_ip_be,
 	rte_be16_t src_port_be, rte_be16_t src_port_mask_be,
 	rte_be16_t dst_port_be, rte_be16_t dst_port_mask_be,
 	uint8_t proto, uint16_t queue_id)
 {
-	unsigned int i;
-	struct rte_eth_ntuple_filter filter_v4 = {
-		.flags = RTE_5TUPLE_FLAGS,
-		.dst_ip = dst_ip_be,
-		.dst_ip_mask = UINT32_MAX,
-		.src_ip = 0,
-		.src_ip_mask = 0,
-		.dst_port = dst_port_be,
-		.dst_port_mask = dst_port_mask_be,
-		.src_port = src_port_be,
-		.src_port_mask = src_port_mask_be,
-		.proto = proto,
-		.proto_mask = UINT8_MAX,
-		.tcp_flags = 0,
-		.priority = 1,
-		.queue = queue_id,
-	};
+	struct rte_flow_attr attr;
+	struct rte_flow_item pattern[3];
+	struct rte_flow_action action[2];
+	struct rte_flow *flow;
+	struct rte_flow_action_queue queue = { .index = queue_id };
+	struct rte_flow_item_eth eth_spec;
+	struct rte_flow_item_eth eth_mask;
+	struct rte_flow_item_ipv4 ip_spec;
+	struct rte_flow_item_ipv4 ip_mask;
+	struct rte_flow_error error;
+	int ret;
 
-	for (i = 0; i < iface->num_ports; i++) {
-		uint16_t port_id = iface->ports[i];
-		int ret = rte_eth_dev_filter_ctrl(port_id,
-			RTE_ETH_FILTER_NTUPLE,
-			RTE_ETH_FILTER_ADD,
-			&filter_v4);
-		switch (ret) {
-		case 0:
-			/* Success. */
-			break;
-		case -ENOTSUP:
-			G_LOG(ERR,
-				"net: hardware doesn't support adding an IPv4 ntuple filter on port %hhu\n",
-				port_id);
-			return -1;
-		case -ENODEV:
-			G_LOG(ERR,
-				"net: port %hhu is invalid for adding an IPv4 ntuple filter\n",
-				port_id);
-			return -1;
-		default:
-			G_LOG(ERR,
-				"net: implementation-specific error (%d: %s) on port %hhu for adding an IPv4 ntuple filter\n",
-				ret, strerror(-ret), port_id);
-			return -1;
-		}
+	if (!iface->rss) {
+		/*
+		 * IPv4 flows can only be used if supported by the NIC
+		 * (to steer matching packets) and if RSS is supported
+		 * (to steer non-matching packets elsewhere).
+		 */
+		G_LOG(NOTICE, "net: cannot use IPv4 flows when RSS is not supported\n");
+		return -1;
+	}
+
+	memset(&attr, 0, sizeof(struct rte_flow_attr));
+	attr.ingress = 1;
+
+	memset(action, 0, sizeof(action));
+	action[0].type = RTE_FLOW_ACTION_TYPE_QUEUE;
+	action[0].conf = &queue;
+	action[1].type = RTE_FLOW_ACTION_TYPE_END;
+
+	memset(&eth_mask, 0, sizeof(struct rte_flow_item_eth));
+	eth_spec.type = rte_cpu_to_be_16(RTE_ETHER_TYPE_IPV4);
+	eth_mask.type = 0xFFFF;
+	pattern[0].spec = &eth_spec;
+	pattern[0].mask = &eth_mask;
+
+	memset(&ip_spec, 0, sizeof(struct rte_flow_item_ipv4));
+	memset(&ip_mask, 0, sizeof(struct rte_flow_item_ipv4));
+	ip_spec.hdr.dst_addr = dst_ip_be;
+	ip_mask.hdr.dst_addr = 0xFFFFFFFF;
+	ip_spec.hdr.next_proto_id = proto;
+	ip_mask.hdr.next_proto_id = 0xFF;
+	pattern[1].type = RTE_FLOW_ITEM_TYPE_IPV4;
+	pattern[1].spec = &ip_spec;
+	pattern[1].mask = &ip_mask;
+
+	if (proto == IPPROTO_TCP) {
+		struct rte_flow_item_tcp tcp_spec;
+		struct rte_flow_item_tcp tcp_mask;
+		memset(&tcp_spec, 0, sizeof(struct rte_flow_item_tcp));
+		memset(&tcp_mask, 0, sizeof(struct rte_flow_item_tcp));
+		tcp_spec.hdr.src_port = src_port_be;
+		tcp_mask.hdr.src_port = src_port_mask_be;
+		tcp_spec.hdr.dst_port = dst_port_be;
+		tcp_mask.hdr.dst_port = dst_port_mask_be;
+		pattern[2].type = RTE_FLOW_ITEM_TYPE_TCP;
+		pattern[2].spec = &tcp_spec;
+		pattern[2].mask = &tcp_mask;
+	} else if (proto == IPPROTO_UDP) {
+		struct rte_flow_item_udp udp_spec;
+		struct rte_flow_item_udp udp_mask;
+		memset(&udp_spec, 0, sizeof(struct rte_flow_item_udp));
+		memset(&udp_mask, 0, sizeof(struct rte_flow_item_udp));
+		udp_spec.hdr.src_port = src_port_be;
+		udp_mask.hdr.src_port = src_port_mask_be;
+		udp_spec.hdr.dst_port = dst_port_be;
+		udp_mask.hdr.dst_port = dst_port_mask_be;
+		pattern[2].type = RTE_FLOW_ITEM_TYPE_UDP;
+		pattern[2].spec = &udp_spec;
+		pattern[2].mask = &udp_mask;
+	} else {
+		G_LOG(ERR, "net: unexpected L4 protocol %hu for IPv4 flow\n",
+			proto);
+		return -1;
+	}
+
+	pattern[3].type = RTE_FLOW_ITEM_TYPE_END;
+
+	ret = rte_flow_validate(iface->id, &attr, pattern, action, &error);
+	if (ret < 0) {
+		/*
+		 * A negative errno value was returned
+		 * (and also put in rte_errno).
+		 */
+		G_LOG(NOTICE, "net: could not validate IPv4 flow: %s (%s)\n",
+			strerror(-ret), error.message);
+		return -1;
+	}
+
+	flow = rte_flow_create(iface->id, &attr, pattern, action, &error);
+	if (flow == NULL) {
+		/* rte_errno is set to a positive errno value. */
+		G_LOG(NOTICE, "net: could not create IPv4 flow: %s (%s)\n",
+			strerror(rte_errno), error.message);
+		return -1;
 	}
 
 	return 0;
@@ -1650,23 +1712,14 @@ start_iface(struct gatekeeper_if *iface, unsigned int num_attempts_link_get)
 			goto stop_partial;
 	}
 
-	iface->hw_filter_eth = true;
 	iface->hw_filter_ntuple = true;
 	for (i = 0; i < iface->num_ports; i++) {
-		if (iface->hw_filter_eth &&
-				(rte_eth_dev_filter_supported(iface->ports[i],
-					RTE_ETH_FILTER_ETHERTYPE) != 0))
-			iface->hw_filter_eth = false;
-
 		if (iface->hw_filter_ntuple &&
 				(rte_eth_dev_filter_supported(iface->ports[i],
 					RTE_ETH_FILTER_NTUPLE) != 0))
 			iface->hw_filter_ntuple = false;
 	}
 
-	G_LOG(NOTICE,
-		"net: EtherType filters %s supported on the %s iface\n",
-		iface->hw_filter_eth ? "are" : "are NOT", iface->name);
 	G_LOG(NOTICE,
 		"net: ntuple filters %s supported on the %s iface\n",
 		iface->hw_filter_ntuple ? "are" : "are NOT", iface->name);
