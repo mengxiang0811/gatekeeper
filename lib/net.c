@@ -314,42 +314,41 @@ ipv4_pkt_filter_add(struct gatekeeper_if *iface, rte_be32_t dst_ip_be,
 	acl_cb_func cb_f, ext_cb_func ext_cb_f,
 	uint8_t *rx_method)
 {
+	struct ipv4_acl_rule ipv4_rule = { };
 	int ret;
 
-	if ((proto == IPPROTO_TCP || proto == IPPROTO_UDP) &&
-			hw_filter_ntuple_available(iface)) {
-		ret = ipv4_ntuple_filter_add(iface, dst_ip_be,
+	if (proto == IPPROTO_TCP || proto == IPPROTO_UDP) {
+		ret = ipv4_flow_add(iface, dst_ip_be,
 			src_port_be, src_port_mask_be,
 			dst_port_be, dst_port_mask_be,
 			proto, queue_id);
 		if (ret < 0) {
-			G_LOG(ERR, "Could not register IPv4 ntuple filter on the %s interface\n",
+			G_LOG(NOTICE, "Could not register IPv4 flow on the %s interface; trying ACL\n",
 				iface->name);
-			return ret;
+			goto acl;
 		}
 		*rx_method |= RX_METHOD_NIC;
-	} else {
-		struct ipv4_acl_rule ipv4_rule = { };
-
-		if (!ipv4_acl_enabled(iface)) {
-			ret = init_ipv4_acls(iface);
-			if (ret < 0)
-				return ret;
-		}
-
-		ipv4_fill_acl_rule(&ipv4_rule, dst_ip_be,
-			src_port_be, src_port_mask_be,
-			dst_port_be, dst_port_mask_be,
-			proto);
-		ret = register_ipv4_acl(&ipv4_rule,
-			cb_f, ext_cb_f, iface);
-		if (ret < 0) {
-			G_LOG(ERR, "Could not register IPv4 ACL on the %s interface\n",
-				iface->name);
-			return ret;
-		}
-		*rx_method |= RX_METHOD_MB;
+		return 0;
 	}
+acl:
+	if (!ipv4_acl_enabled(iface)) {
+		ret = init_ipv4_acls(iface);
+		if (ret < 0)
+			return ret;
+	}
+
+	ipv4_fill_acl_rule(&ipv4_rule, dst_ip_be,
+		src_port_be, src_port_mask_be,
+		dst_port_be, dst_port_mask_be,
+		proto);
+	ret = register_ipv4_acl(&ipv4_rule,
+		cb_f, ext_cb_f, iface);
+	if (ret < 0) {
+		G_LOG(ERR, "Could not register IPv4 ACL on the %s interface\n",
+			iface->name);
+		return ret;
+	}
+	*rx_method |= RX_METHOD_MB;
 
 	return 0;
 }
@@ -1711,18 +1710,6 @@ start_iface(struct gatekeeper_if *iface, unsigned int num_attempts_link_get)
 		if (ret < 0)
 			goto stop_partial;
 	}
-
-	iface->hw_filter_ntuple = true;
-	for (i = 0; i < iface->num_ports; i++) {
-		if (iface->hw_filter_ntuple &&
-				(rte_eth_dev_filter_supported(iface->ports[i],
-					RTE_ETH_FILTER_NTUPLE) != 0))
-			iface->hw_filter_ntuple = false;
-	}
-
-	G_LOG(NOTICE,
-		"net: ntuple filters %s supported on the %s iface\n",
-		iface->hw_filter_ntuple ? "are" : "are NOT", iface->name);
 
 	rte_eth_macaddr_get(iface->id, &iface->eth_addr);
 
