@@ -188,7 +188,7 @@ l_lpm_add(lua_State *l)
 	ret = rte_lpm_add(lpm_ud->lpm, ntohl(ip), depth, label);
 	if (ret < 0) {
 		luaL_error(l, "lpm: failed to add network policy [ip: %d, depth: %d, label: %d] to the lpm table at %s(%d): %s",
-			ip, depth, label, __func__, -ret, strerror(-ret));
+			ip, depth, label, __func__, -ret, rte_strerror(-ret));
 	}
 
 	return 0;
@@ -361,10 +361,10 @@ l_lpm6_add(lua_State *l)
 		if (unlikely(inet_ntop(AF_INET6, ipv6_addr, addr_buf,
 				INET6_ADDRSTRLEN) == NULL)) {
 			luaL_error(l, "lpm6: failed to add a network policy to the lpm6 table at %s(%d): %s",
-				__func__, -ret, strerror(-ret));
+				__func__, -ret, rte_strerror(-ret));
 		}
 		luaL_error(l, "lpm6: failed to add a network policy to the lpm6 table at %s(%s/%d, %d): %s",
-			__func__, addr_buf, depth, -ret, strerror(-ret));
+			__func__, addr_buf, depth, -ret, rte_strerror(-ret));
 	}
 
 	return 0;

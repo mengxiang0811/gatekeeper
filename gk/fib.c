@@ -97,7 +97,7 @@ gk_lpm_del_ipv4_route(struct gk_lpm *ltbl, uint32_t ip, uint8_t depth)
 	ret2 = rte_lpm_delete(ltbl->lpm, ntohl(ip), depth);
 	if (unlikely(ret != ret2)) {
 		G_LOG(CRIT, "%s(): bug: unexpected mismatch, ret == %i and ret2 == %i: %s\n",
-			__func__, ret, ret2, strerror(-ret2));
+			__func__, ret, ret2, rte_strerror(-ret2));
 	}
 
 	return ret2;
@@ -115,7 +115,7 @@ gk_lpm_del_ipv6_route(struct gk_lpm *ltbl, const uint8_t *ip, uint8_t depth)
 	ret2 = rte_lpm6_delete(ltbl->lpm6, ip, depth);
 	if (unlikely(ret != ret2)) {
 		G_LOG(CRIT, "%s(): bug: unexpected mismatch, ret == %i and ret2 == %i: %s\n",
-			__func__, ret, ret2, strerror(-ret2));
+			__func__, ret, ret2, rte_strerror(-ret2));
 	}
 
 	return ret2;
@@ -1142,7 +1142,7 @@ del_fib_entry_numerical_locked(const struct ip_prefix *prefix_info,
 		&gk_conf->lpm_tbl);
 	if (ret < 0) {
 		G_LOG(ERR, "%s(%s) failed to remove the IP prefix (errno=%i): %s\n",
-			__func__, prefix_info->str, -ret, strerror(-ret));
+			__func__, prefix_info->str, -ret, rte_strerror(-ret));
 		return ret;
 	}
 

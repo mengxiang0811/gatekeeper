@@ -21,6 +21,7 @@
 
 #include <rte_log.h>
 #include <rte_debug.h>
+#include <rte_errno.h>
 
 #include "gatekeeper_lpm.h"
 #include "gatekeeper_main.h"
@@ -95,7 +96,7 @@ lpm_lookup_ipv4(struct rte_lpm *lpm, uint32_t ip)
 
 		G_LOG(DEBUG,
 			"lpm: IPv4 lookup miss; can't convert IP to string: %s\n",
-			strerror(errno));
+			rte_strerror(-ret));
 		return ret;
 	}
 
@@ -158,7 +159,7 @@ lpm_lookup_ipv6(struct rte_lpm6 *lpm, struct in6_addr *ip)
 
 		G_LOG(DEBUG,
 			"lpm: IPv6 lookup miss; can't convert IP to string: %s\n",
-			strerror(errno));
+			rte_strerror(-ret));
 		return ret;
 	}
 
