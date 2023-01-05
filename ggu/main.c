@@ -518,7 +518,7 @@ submit_ggu(struct rte_mbuf **pkts, unsigned int num_pkts,
 
 	if (req == NULL) {
 		G_LOG(ERR,
-			"%s: allocation of mailbox message failed\n",
+			"%s(): allocation of mailbox message failed\n",
 			__func__);
 		ret = -ENOMEM;
 		goto free_pkts;
@@ -530,7 +530,7 @@ submit_ggu(struct rte_mbuf **pkts, unsigned int num_pkts,
 	ret = mb_send_entry(&ggu_conf->mailbox, req);
 	if (ret < 0) {
 		G_LOG(ERR,
-			"%s: failed to enqueue message to mailbox\n",
+			"%s(): failed to enqueue message to mailbox\n",
 			__func__);
 		goto free_pkts;
 	}
@@ -591,7 +591,8 @@ ggu_proc(void *arg)
 	G_LOG(NOTICE, "The GT-GK unit is running at tid = %u\n", gettid());
 
 	if (needed_caps(0, NULL) < 0) {
-		G_LOG(ERR, "Could not set needed capabilities\n");
+		G_LOG(ERR, "%s(): Could not set needed capabilities\n",
+			__func__);
 		exiting = true;
 	}
 
@@ -646,8 +647,8 @@ ggu_stage1(void *arg)
 		ret = get_queue_id(&ggu_conf->net->back, QUEUE_TYPE_RX,
 			ggu_conf->lcore_id, ggu_conf->mp);
 		if (ret < 0) {
-			G_LOG(ERR, "Cannot assign an RX queue for the back interface for lcore %u\n",
-				ggu_conf->lcore_id);
+			G_LOG(ERR, "%s(): Cannot assign an RX queue for the back interface for lcore %u\n",
+				__func__, ggu_conf->lcore_id);
 			return ret;
 		}
 		ggu_conf->rx_queue_back = ret;
@@ -682,7 +683,8 @@ ggu_stage2(void *arg)
 			submit_ggu, NULL,
 			&ggu_conf->rx_method_back);
 		if (ret < 0) {
-			G_LOG(ERR, "Could not configure IPv4 filter for GGU packets\n");
+			G_LOG(ERR, "%s(): Could not configure IPv4 filter for GGU packets\n",
+				__func__);
 			return ret;
 		}
 	}
@@ -700,7 +702,8 @@ ggu_stage2(void *arg)
 			submit_ggu, NULL,
 			&ggu_conf->rx_method_back);
 		if (ret < 0) {
-			G_LOG(ERR, "Could not configure IPv6 filter for GGU packets\n");
+			G_LOG(ERR, "%s(): could not configure IPv6 filter for GGU packets\n",
+				__func__);
 			return ret;
 		}
 	}
@@ -721,7 +724,7 @@ run_ggu(struct net_config *net_conf,
 	}
 
 	if (!net_conf->back_iface_enabled) {
-		G_LOG(ERR, "Back interface is required\n");
+		G_LOG(ERR, "%s(): back interface is required\n", __func__);
 		ret = -1;
 		goto out;
 	}
@@ -804,14 +807,16 @@ alloc_ggu_conf(unsigned int lcore)
 		if (ggu_conf == NULL) {
 			rte_atomic16_clear(&num_ggu_conf_alloc);
 			G_LOG(ERR,
-				"Failed to allocate the first instance of struct ggu_config\n");
+				"%s(): failed to allocate the first instance of struct ggu_config\n",
+				__func__);
 			return NULL;
 		}
 		ggu_conf->lcore_id = lcore;
 		return ggu_conf;
 	} else {
 		G_LOG(ERR,
-			"Trying to allocate the second instance of struct ggu_config\n");
+			"%s(): trying to allocate the second instance of struct ggu_config\n",
+			__func__);
 		return NULL;
 	}
 }

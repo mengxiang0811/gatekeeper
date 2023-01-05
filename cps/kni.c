@@ -120,8 +120,8 @@ modify_ipaddr(struct mnl_socket *nl, unsigned int cmd, int flags,
 
 	ret = mnl_socket_sendto(nl, nlh, nlh->nlmsg_len);
 	if (ret < 0) {
-		G_LOG(ERR, "mnl_socket_sendto: cannot update %s with new IP address (family %d) (operation %d): %s\n",
-			kni_name, family, cmd, strerror(errno));
+		G_LOG(ERR, "mnl_socket_sendto: cannot update %s with new IP address (family %d) (operation %d) (errno=%i): %s\n",
+			kni_name, family, cmd, errno, strerror(errno));
 		return ret;
 	}
 
@@ -133,15 +133,15 @@ modify_ipaddr(struct mnl_socket *nl, unsigned int cmd, int flags,
 
 	ret = mnl_socket_recvfrom(nl, buf, sizeof(buf));
 	if (ret == -1) {
-		G_LOG(ERR, "mnl_socket_recvfrom: cannot update %s with new IP address (family %d) (operation %d): %s\n",
-			kni_name, family, cmd, strerror(errno));
+		G_LOG(ERR, "mnl_socket_recvfrom: cannot update %s with new IP address (family %d) (operation %d) (errno=%i): %s\n",
+			kni_name, family, cmd, errno, strerror(errno));
 		return ret;
 	}
 
 	ret = mnl_cb_run(buf, ret, seq, portid, NULL, NULL);
 	if (ret == -1) {
-		G_LOG(ERR, "mnl_cb_run: cannot update %s with new IP address (family %d) (operation %d): %s\n",
-			kni_name, family, cmd, strerror(errno));
+		G_LOG(ERR, "mnl_cb_run: cannot update %s with new IP address (family %d) (operation %d) (errno=%i): %s\n",
+			kni_name, family, cmd, errno, strerror(errno));
 		return ret;
 	}
 
@@ -202,8 +202,8 @@ modify_link(struct mnl_socket *nl, struct rte_kni *kni,
 
 	pid = fork();
 	if (pid == -1) {
-		G_LOG(ERR, "Fork failed, can't modify KNI %s link: %s\n",
-			kni_name, strerror(errno));
+		G_LOG(ERR, "Fork failed, can't modify KNI %s link (errno=%i): %s\n",
+			kni_name, errno, strerror(errno));
 		return -1;
 	} else if (pid == 0) {
 		/*
@@ -213,9 +213,9 @@ modify_link(struct mnl_socket *nl, struct rte_kni *kni,
 		int ret = mnl_socket_sendto(nl, nlh, nlh->nlmsg_len);
 		if (ret < 0) {
 			G_LOG(ERR,
-				"mnl_socket_sendto: cannot bring KNI %s %s: %s\n",
+				"mnl_socket_sendto: cannot bring KNI %s %s (errno=%i): %s\n",
 				kni_name, if_up ? "up" : "down",
-				strerror(errno));
+				errno, strerror(errno));
 			_exit(EXIT_FAILURE);
 		}
 		_exit(EXIT_SUCCESS);
@@ -228,8 +228,8 @@ modify_link(struct mnl_socket *nl, struct rte_kni *kni,
 			/* Try to process child's request. */
 			int ret = rte_kni_handle_request(kni);
 			if (ret < 0) {
-				G_LOG(ERR, "%s: error in handling userspace request\n",
-					__func__);
+				G_LOG(ERR, "%s() (errno=%i): error in handling userspace request: %s\n",
+					__func__, -ret, rte_strerror(-ret));
 				goto next;
 			}
 
@@ -239,23 +239,23 @@ modify_link(struct mnl_socket *nl, struct rte_kni *kni,
 				/* Keep trying to handle the KNI request. */
 				goto next;
 			} else if (ret == -1) {
-				G_LOG(ERR, "waitpid: %s\n", strerror(errno));
+				G_LOG(ERR, "waitpid (errno=%i): %s\n", errno, strerror(errno));
 				goto kill;
 			}
 
 			ret = mnl_socket_recvfrom(nl, buf, sizeof(buf));
 			if (ret == -1) {
-				G_LOG(ERR, "mnl_socket_recvfrom: cannot bring KNI %s %s: %s\n",
+				G_LOG(ERR, "mnl_socket_recvfrom: cannot bring KNI %s %s (errno=%i): %s\n",
 					kni_name, if_up ? "up" : "down",
-					strerror(errno));
+					errno, strerror(errno));
 				return ret;
 			}
 
 			ret = mnl_cb_run(buf, ret, seq, portid, NULL, NULL);
 			if (ret == -1) {
-				G_LOG(ERR, "mnl_cb_run: cannot bring KNI %s %s: %s\n",
+				G_LOG(ERR, "mnl_cb_run: cannot bring KNI %s %s (errno=%i): %s\n",
 					kni_name, if_up ? "up" : "down",
-					strerror(errno));
+					errno, strerror(errno));
 				return ret;
 			}
 
@@ -281,13 +281,13 @@ kni_config_ip_addrs(struct rte_kni *kni, unsigned int kni_index,
 
 	nl = mnl_socket_open(NETLINK_ROUTE);
 	if (nl == NULL) {
-		G_LOG(ERR, "mnl_socket_open: %s\n", strerror(errno));
+		G_LOG(ERR, "mnl_socket_open (errno=%i): %s\n", errno, strerror(errno));
 		return -1;
 	}
 
 	ret = mnl_socket_bind(nl, 0, MNL_SOCKET_AUTOPID);
 	if (ret < 0) {
-		G_LOG(ERR, "mnl_socket_bind: %s\n", strerror(errno));
+		G_LOG(ERR, "mnl_socket_bind (errno=%i): %s\n", errno, strerror(errno));
 		goto close;
 	}
 
@@ -320,13 +320,13 @@ kni_config_link(struct rte_kni *kni)
 
 	nl = mnl_socket_open(NETLINK_ROUTE);
 	if (nl == NULL) {
-		G_LOG(ERR, "mnl_socket_open: %s\n", strerror(errno));
+		G_LOG(ERR, "mnl_socket_open (errno=%i): %s\n", errno, strerror(errno));
 		return -1;
 	}
 
 	ret = mnl_socket_bind(nl, 0, MNL_SOCKET_AUTOPID);
 	if (ret < 0) {
-		G_LOG(ERR, "mnl_socket_bind: %s\n", strerror(errno));
+		G_LOG(ERR, "mnl_socket_bind (errno=%i): %s\n", errno, strerror(errno));
 		goto close;
 	}
 
@@ -355,13 +355,13 @@ grab_file(const char *filename, unsigned long *size)
 
 	int fd = open(filename, O_RDONLY, 0);
 	if (fd < 0) {
-		G_LOG(ERR, "open: %s\n", strerror(errno));
+		G_LOG(ERR, "open (errno=%i): %s\n", errno, strerror(errno));
 		return NULL;
 	}
 
 	ret = fstat(fd, &stat_buf);
 	if (ret < 0) {
-		G_LOG(ERR, "fstat: %s\n", strerror(errno));
+		G_LOG(ERR, "fstat (errno=%i): %s\n", errno, strerror(errno));
 		goto close;
 	}
 
@@ -378,7 +378,7 @@ grab_file(const char *filename, unsigned long *size)
 	while ((ret = read(fd, buffer + *size, kmod_size - *size)) > 0)
 		*size += ret;
 	if (ret < 0) {
-		G_LOG(ERR, "read: %s\n", strerror(errno));
+		G_LOG(ERR, "read (errno=%i): %s\n", errno, strerror(errno));
 		goto free;
 	}
 
@@ -430,7 +430,7 @@ get_loaded_kmod_attr(const char *attr, char *val, size_t val_len)
 
 	attr_file = fopen(path, "r");
 	if (attr_file == NULL) {
-		G_LOG(ERR, "Can't open %s: %s\n", path, strerror(errno));
+		G_LOG(ERR, "Can't open %s (errno=%i): %s\n", path, errno, strerror(errno));
 		return -1;
 	}
 
@@ -508,7 +508,7 @@ find_kni_kmod_path(char *path, size_t path_len, const char *alias)
 
 	/* Get kernel name and build module path. */
 	if (uname(&u) < 0) {
-		G_LOG(ERR, "uname: %s\n", strerror(errno));
+		G_LOG(ERR, "uname (errno=%i): %s\n", errno, strerror(errno));
 		return -1;
 	}
 	ret = snprintf(dirname, sizeof(dirname),
@@ -614,14 +614,14 @@ init_kni(const char *kni_kmod_path, unsigned int num_kni)
 
 	file = grab_file(kni_kmod_path, &len);
 	if (file == NULL) {
-		G_LOG(ERR, "%s: can't read '%s'\n", __func__, kni_kmod_path);
+		G_LOG(ERR, "%s(): can't read '%s'\n", __func__, kni_kmod_path);
 		return -1;
 	}
 
 	ret = init_module(file, len, "");
 	if (ret < 0) {
 		if (errno == EEXIST) {
-			G_LOG(NOTICE, "%s: %s already inserted\n",
+			G_LOG(NOTICE, "%s(): %s already inserted\n",
 				__func__, kni_kmod_path);
 
 			if (loaded_kmod_matches_file(file, len)) {
@@ -629,7 +629,7 @@ init_kni(const char *kni_kmod_path, unsigned int num_kni)
 				goto success;
 			}
 		} else {
-			G_LOG(ERR, "%s: error inserting '%s': %d %s\n",
+			G_LOG(ERR, "%s(): error inserting '%s': %d %s\n",
 				__func__, kni_kmod_path, ret, moderror(errno));
 		}
 
@@ -655,8 +655,8 @@ check_usage(const char *modname)
 
 	module_list = fopen(PROC_MODULES_FILENAME, "r");
 	if (module_list == NULL) {
-		G_LOG(ERR, "Can't open %s: %s\n", PROC_MODULES_FILENAME,
-			strerror(errno));
+		G_LOG(ERR, "Can't open %s (errno=%i): %s\n", PROC_MODULES_FILENAME,
+			errno, strerror(errno));
 		return -1;
 	}
 
@@ -728,7 +728,8 @@ rm_kni(void)
 
 	ret = delete_module(name, O_NONBLOCK);
 	if (ret < 0)
-		G_LOG(ERR, "Error removing %s: %s\n", name, strerror(errno));
+		G_LOG(ERR, "Error removing %s (errno=%i): %s\n",
+			name, errno, strerror(errno));
 }
 
 static void
@@ -758,7 +759,7 @@ cps_arp_cb(const struct lls_map *map, void *arg,
 
 	req = mb_alloc_entry(&cps_conf->mailbox);
 	if (req == NULL) {
-		G_LOG(ERR, "%s: allocation of mailbox message failed\n",
+		G_LOG(ERR, "%s(): allocation of mailbox message failed\n",
 			__func__);
 		return;
 	}
@@ -770,7 +771,7 @@ cps_arp_cb(const struct lls_map *map, void *arg,
 
 	ret = mb_send_entry(&cps_conf->mailbox, req);
 	if (ret < 0) {
-		G_LOG(ERR, "%s: failed to enqueue message to mailbox\n",
+		G_LOG(ERR, "%s(): failed to enqueue message to mailbox\n",
 			__func__);
 		return;
 	}
@@ -787,14 +788,15 @@ kni_process_arp(struct cps_config *cps_conf, struct gatekeeper_if *iface,
 	struct arp_request *entry;
 
 	if (unlikely(!arp_enabled(cps_conf->lls))) {
-		G_LOG(NOTICE, "KNI for %s iface received ARP packet, but the interface is not configured for ARP\n",
-			iface->name);
+		G_LOG(NOTICE, "%s(): KNI for %s iface received ARP packet, but the interface is not configured for ARP\n",
+			__func__, iface->name);
 		goto out;
 	}
 
 	if (unlikely(pkt_len < sizeof(*eth_hdr) + sizeof(*arp_hdr))) {
-		G_LOG(ERR, "KNI received ARP packet of size %hu bytes, but it should be at least %zu bytes\n",
-			pkt_len, sizeof(*eth_hdr) + sizeof(*arp_hdr));
+		G_LOG(ERR, "%s(): KNI for %s iface received ARP packet of size %hu bytes, but it should be at least %zu bytes\n",
+			__func__, iface->name, pkt_len,
+			sizeof(*eth_hdr) + sizeof(*arp_hdr));
 		goto out;
 	}
 
@@ -814,8 +816,8 @@ kni_process_arp(struct cps_config *cps_conf, struct gatekeeper_if *iface,
 
 	ret = rte_mempool_get(cps_conf->arp_mp, (void **)&arp_req);
 	if (unlikely(ret < 0)) {
-		G_LOG(ERR, "Failed to get a new entry from the ARP request mempool - %s\n",
-			rte_strerror(-ret));
+		G_LOG(ERR, "Failed to get a new entry from the ARP request mempool (errno=%i) - %s\n",
+			-ret, rte_strerror(-ret));
 		goto out;
 	}
 
@@ -857,7 +859,7 @@ cps_nd_cb(const struct lls_map *map, void *arg,
 
 	req = mb_alloc_entry(&cps_conf->mailbox);
 	if (req == NULL) {
-		G_LOG(ERR, "%s: allocation of mailbox message failed\n",
+		G_LOG(ERR, "%s(): allocation of mailbox message failed\n",
 			__func__);
 		return;
 	}
@@ -870,7 +872,7 @@ cps_nd_cb(const struct lls_map *map, void *arg,
 
 	ret = mb_send_entry(&cps_conf->mailbox, req);
 	if (ret < 0) {
-		G_LOG(ERR, "%s: failed to enqueue message to mailbox\n",
+		G_LOG(ERR, "%s(): failed to enqueue message to mailbox\n",
 			__func__);
 		return;
 	}
@@ -888,14 +890,15 @@ kni_process_nd(struct cps_config *cps_conf, struct gatekeeper_if *iface,
 	struct nd_request *entry;
 
 	if (unlikely(!nd_enabled(cps_conf->lls))) {
-		G_LOG(NOTICE, "KNI for %s iface received ND packet, but the interface is not configured for ND\n",
-			iface->name);
+		G_LOG(NOTICE, "%s(): KNI for %s iface received ND packet, but the interface is not configured for ND\n",
+			__func__, iface->name);
 		goto out;
 	}
 
 	if (pkt_len < ND_NEIGH_PKT_MIN_LEN(sizeof(*eth_hdr))) {
-		G_LOG(NOTICE, "ND packet received is %"PRIx16" bytes but should be at least %lu bytes\n",
-			pkt_len, ND_NEIGH_PKT_MIN_LEN(sizeof(*eth_hdr)));
+		G_LOG(NOTICE, "%s(%s): ND packet received is %"PRIx16" bytes but should be at least %lu bytes\n",
+			__func__, iface->name, pkt_len,
+			ND_NEIGH_PKT_MIN_LEN(sizeof(*eth_hdr)));
 		goto out;
 	}
 
@@ -903,8 +906,8 @@ kni_process_nd(struct cps_config *cps_conf, struct gatekeeper_if *iface,
 		sizeof(*eth_hdr) + sizeof(struct rte_ipv6_hdr));
 	if (icmpv6_hdr->type == ND_NEIGHBOR_ADVERTISEMENT_TYPE &&
 			icmpv6_hdr->code == ND_NEIGHBOR_ADVERTISEMENT_CODE) {
-		G_LOG(NOTICE, "ND Advertisement packet received from KNI attached to %s iface\n",
-			iface->name);
+		G_LOG(NOTICE, "%s(): ND Advertisement packet received from KNI attached to %s iface\n",
+			__func__, iface->name);
 		goto out;
 	}
 
@@ -918,8 +921,8 @@ kni_process_nd(struct cps_config *cps_conf, struct gatekeeper_if *iface,
 
 	ret = rte_mempool_get(cps_conf->nd_mp, (void **)&nd_req);
 	if (unlikely(ret < 0)) {
-		G_LOG(ERR, "Failed to get a new entry from the ND request mempool - %s\n",
-			rte_strerror(-ret));
+		G_LOG(ERR, "%s(): Failed to get a new entry from the ND request mempool (errno=%i)- %s\n",
+			__func__, -ret, rte_strerror(-ret));
 		goto out;
 	}
 

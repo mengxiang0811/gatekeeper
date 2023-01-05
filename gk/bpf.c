@@ -505,8 +505,8 @@ gk_init_bpf_cookie(const struct gk_config *gk_conf, uint8_t program_index,
 
 	bpf = handler->f_init;
 	if (bpf == NULL || handler->f_pkt == NULL) {
-		G_LOG(ERR, "The GK BPF program at index %u is not available\n",
-			program_index);
+		G_LOG(ERR, "%s(): the GK BPF program at index %u is not available\n",
+			__func__, program_index);
 		return -1;
 	}
 
@@ -518,8 +518,8 @@ gk_init_bpf_cookie(const struct gk_config *gk_conf, uint8_t program_index,
 		? jit(&frame.ctx)
 		: rte_bpf_exec(bpf, &frame.ctx);
 	if (bpf_ret != GK_BPF_INIT_RET_OK) {
-		G_LOG(ERR, "The function init of the GK BPF program at index %u returned an error\n",
-			program_index);
+		G_LOG(ERR, "%s(): the function init of the GK BPF program at index %u returned an error\n",
+			__func__, program_index);
 		return -1;
 	}
 	return 0;
@@ -556,7 +556,7 @@ parse_packet_further(struct ipacket *packet, struct gk_bpf_pkt_ctx *ctx)
 		int l3_len = ipv6_skip_exthdr(ipv6_hdr,
 			pkt->data_len - parsed_len, &ctx->l4_proto);
 		if (l3_len < 0) {
-			G_LOG(NOTICE, "%s: Failed to parse IPv6 extension headers\n",
+			G_LOG(NOTICE, "%s(): Failed to parse IPv6 extension headers\n",
 				__func__);
 			return -1;
 		}
@@ -568,7 +568,7 @@ parse_packet_further(struct ipacket *packet, struct gk_bpf_pkt_ctx *ctx)
 	}
 
 	default:
-		G_LOG(ERR, "%s: Unknown L3 header %hu\n",
+		G_LOG(ERR, "%s(): Unknown L3 header %hu\n",
 			__func__, packet->flow.proto);
 		return -1;
 	}
@@ -602,8 +602,8 @@ gk_bpf_decide_pkt(struct gk_config *gk_conf, uint8_t program_index,
 
 	if (unlikely(bpf == NULL)) {
 		G_LOG(WARNING,
-			"The BPF program at index %u does not have function pkt\n",
-			program_index);
+			"%s(): the BPF program at index %u does not have function pkt\n",
+			__func__, program_index);
 		return -EINVAL;
 	}
 
@@ -618,8 +618,8 @@ gk_bpf_decide_pkt(struct gk_config *gk_conf, uint8_t program_index,
 	if (unlikely(*p_bpf_ret == GK_BPF_PKT_RET_FORWARD &&
 			!frame.ready_to_tx)) {
 		G_LOG(ERR,
-			"The BPF program at index %u has a bug: it returned GK_BPF_PKT_RET_FORWARD without successfully calling gk_bpf_prep_for_tx()\n",
-			program_index);
+			"%s(): the BPF program at index %u has a bug: it returned GK_BPF_PKT_RET_FORWARD without successfully calling gk_bpf_prep_for_tx()\n",
+			__func__, program_index);
 		return -EIO;
 	}
 

@@ -205,8 +205,9 @@ enqueue_req(struct sol_config *sol_conf, struct sol_instance *instance,
 	uint8_t priority = get_prio(req);
 
 	if (unlikely(priority > GK_MAX_REQ_PRIORITY)) {
-		G_LOG(WARNING, "Trying to enqueue a request with priority %hhu, but should be in range [0, %d]. Overwrite the priority to PRIORITY_REQ_MIN (%hhu)\n",
-			priority, GK_MAX_REQ_PRIORITY, PRIORITY_REQ_MIN);
+		G_LOG(WARNING, "%s(): trying to enqueue a request with priority %hhu, but should be in range [0, %d]. Overwrite the priority to PRIORITY_REQ_MIN (%hhu)\n",
+			__func__, priority, GK_MAX_REQ_PRIORITY,
+			PRIORITY_REQ_MIN);
 		set_prio(req, PRIORITY_REQ_MIN);
 		priority = PRIORITY_REQ_MIN;
 	}
@@ -326,7 +327,8 @@ dequeue_reqs(struct sol_config *sol_conf,
 			 * the log rate of the log entry below when
 			 * Gatekeeper servers are under attacks.
 			 */
-			G_LOG(NOTICE, "Out of request bandwidth\n");
+			G_LOG(NOTICE, "%s(): out of request bandwidth\n",
+				__func__);
 			goto out;
 		}
 
@@ -384,8 +386,8 @@ iface_speed_bytes(struct gatekeeper_if *iface, uint64_t *link_speed_bytes)
 		struct rte_eth_link link;
 		ret = rte_eth_link_get(iface->ports[i], &link);
 		if (ret < 0) {
-			G_LOG(ERR, "net: querying port %hhu failed with err - %s\n",
-				iface->ports[i], rte_strerror(-ret));
+			G_LOG(ERR, "%s(): net: querying port %hhu failed with err - %s\n",
+				__func__, iface->ports[i], rte_strerror(-ret));
 			goto err;
 		}
 
@@ -425,15 +427,17 @@ req_queue_init(struct sol_config *sol_conf)
 	ret = iface_speed_bytes(&sol_conf->net->back, &link_speed_bytes);
 	if (ret == 0) {
 		G_LOG(NOTICE,
-			"Back interface link speed: %"PRIu64" bytes per second\n",
-			link_speed_bytes);
+			"%s(): back interface link speed: %"PRIu64" bytes per second\n",
+			__func__, link_speed_bytes);
 		/* Keep max number of bytes a float for later calculations. */
 		max_credit_bytes_precise =
 			sol_conf->req_bw_rate * link_speed_bytes;
 	} else {
-		G_LOG(NOTICE, "Back interface link speed: undefined\n");
+		G_LOG(NOTICE, "%s(): back interface link speed: undefined\n",
+			__func__);
 		if (sol_conf->req_channel_bw_mbps <= 0) {
-			G_LOG(ERR, "When link speed on back interface is undefined, parameter req_channel_bw_mbps must be calculated and defined\n");
+			G_LOG(ERR, "%s(): when link speed on back interface is undefined, parameter req_channel_bw_mbps must be calculated and defined\n",
+				__func__);
 			return -1;
 		}
 		max_credit_bytes_precise =
@@ -458,15 +462,16 @@ req_queue_init(struct sol_config *sol_conf)
 		cycles_per_byte_precise - cycles_per_byte_floor,
 		sol_conf->tb_rate_approx_err, &a, &b);
 	if (ret < 0) {
-		G_LOG(ERR, "Could not approximate the request queue's allocated bandwidth\n");
+		G_LOG(ERR, "%s(): could not approximate the request queue's allocated bandwidth\n",
+			__func__);
 		return ret;
 	}
 
 	/* Add integer number of cycles per byte to numerator. */
 	a += cycles_per_byte_floor * b;
 
-	G_LOG(NOTICE, "Cycles per byte (%f) represented as a rational: %u / %u\n",
-		cycles_per_byte_precise, a, b);
+	G_LOG(NOTICE, "%s(): cycles per byte (%f) represented as a rational: %u / %u\n",
+		__func__, cycles_per_byte_precise, a, b);
 
 	now = rte_rdtsc();
 
@@ -516,8 +521,8 @@ cleanup_sol(struct sol_config *sol_conf)
 		}
 
 		if (req_queue->len > 0)
-			G_LOG(NOTICE, "Bug: removing all requests from the priority queue on cleanup leaves the queue length at %"PRIu32" at lcore %u\n",
-				req_queue->len, sol_conf->lcores[i]);
+			G_LOG(NOTICE, "%s(): bug: removing all requests from the priority queue on cleanup leaves the queue length at %"PRIu32" at lcore %u\n",
+				__func__, req_queue->len, sol_conf->lcores[i]);
 
 		rte_ring_free(sol_conf->instances[i].ring);
 	}
@@ -566,7 +571,8 @@ sol_proc(void *arg)
 	G_LOG(NOTICE, "The Solicitor block is running at tid = %u\n", gettid());
 
 	if (needed_caps(0, NULL) < 0) {
-		G_LOG(ERR, "Could not set needed capabilities\n");
+		G_LOG(ERR, "%s(): could not set needed capabilities\n",
+			__func__);
 		exiting = true;
 	}
 
@@ -608,16 +614,16 @@ sol_stage1(void *arg)
 			rte_lcore_to_socket_id(lcore), RING_F_SC_DEQ);
 		if (inst_ptr->ring == NULL) {
 			G_LOG(ERR,
-				"sol: can't create ring sol_reqs_ring at lcore %u\n",
-				lcore);
+				"%s(): sol: can't create ring sol_reqs_ring at lcore %u\n",
+				__func__, lcore);
 			goto cleanup;
 		}
 
 		ret = get_queue_id(&sol_conf->net->back, QUEUE_TYPE_TX,
 			lcore, NULL);
 		if (ret < 0) {
-			G_LOG(ERR, "Cannot assign a TX queue for the back interface for lcore %u\n",
-				lcore);
+			G_LOG(ERR, "%s(): cannot assign a TX queue for the back interface for lcore %u\n",
+				__func__, lcore);
 			goto cleanup;
 		}
 		inst_ptr->tx_queue_back = ret;
@@ -669,43 +675,46 @@ run_sol(struct net_config *net_conf, struct sol_config *sol_conf)
 	}
 
 	if (!net_conf->back_iface_enabled) {
-		G_LOG(ERR, "Back interface is required\n");
+		G_LOG(ERR, "%s(): back interface is required\n", __func__);
 		ret = -1;
 		goto out;
 	}
 
 	if (sol_conf->pri_req_max_len == 0) {
 		G_LOG(ERR,
-			"Priority queue max len must be greater than 0\n");
+			"%s(): Priority queue max len must be greater than 0\n",
+			__func__);
 		ret = -1;
 		goto out;
 	}
 
 	if (sol_conf->enq_burst_size == 0 || sol_conf->deq_burst_size == 0) {
-		G_LOG(ERR, "Priority queue enqueue and dequeue sizes must both be greater than 0\n");
+		G_LOG(ERR, "%s(): priority queue enqueue and dequeue sizes must both be greater than 0\n",
+			__func__);
 		ret = -1;
 		goto out;
 	}
 
 	if (sol_conf->deq_burst_size > sol_conf->pri_req_max_len ||
 			sol_conf->enq_burst_size > sol_conf->pri_req_max_len) {
-		G_LOG(ERR, "Request queue enqueue and dequeue sizes must be less than the max length of the request queue\n");
+		G_LOG(ERR, "%s(): request queue enqueue and dequeue sizes must be less than the max length of the request queue\n",
+			__func__);
 		ret = -1;
 		goto out;
 	}
 
 	if (sol_conf->req_bw_rate <= 0 || sol_conf->req_bw_rate >= 1) {
 		G_LOG(ERR,
-			"Request queue bandwidth must be in range (0, 1), but it has been specified as %f\n",
-			sol_conf->req_bw_rate);
+			"%s(): request queue bandwidth must be in range (0, 1), but it has been specified as %f\n",
+			__func__, sol_conf->req_bw_rate);
 		ret = -1;
 		goto out;
 	}
 
 	if (sol_conf->req_channel_bw_mbps < 0) {
 		G_LOG(ERR,
-			"Request channel bandwidth in Mbps must be greater than 0 when the NIC doesn't supply guaranteed bandwidth, but is %f\n",
-			sol_conf->req_channel_bw_mbps);
+			"%s(): request channel bandwidth in Mbps must be greater than 0 when the NIC doesn't supply guaranteed bandwidth, but is %f\n",
+			__func__, sol_conf->req_channel_bw_mbps);
 		ret = -1;
 		goto out;
 	}
@@ -780,13 +789,15 @@ alloc_sol_conf(void)
 	struct sol_config *sol_conf;
 	static rte_atomic16_t num_sol_conf_alloc = RTE_ATOMIC16_INIT(0);
 	if (rte_atomic16_test_and_set(&num_sol_conf_alloc) != 1) {
-		G_LOG(ERR, "Trying to allocate the second instance of struct sol_config\n");
+		G_LOG(ERR, "%s(): trying to allocate the second instance of struct sol_config\n",
+			__func__);
 		return NULL;
 	}
 	sol_conf = rte_calloc("sol_config", 1, sizeof(struct sol_config), 0);
 	if (sol_conf == NULL) {
 		rte_atomic16_clear(&num_sol_conf_alloc);
-		G_LOG(ERR, "Failed to allocate the first instance of struct sol_config\n");
+		G_LOG(ERR, "%s(): failed to allocate the first instance of struct sol_config\n",
+			__func__);
 		return NULL;
 	}
 	return sol_conf;
@@ -799,8 +810,8 @@ gk_solicitor_enqueue_bulk(struct sol_instance *instance,
 	unsigned int num_enqueued = rte_ring_mp_enqueue_bulk(instance->ring,
 		(void **)pkts, num_pkts, NULL);
 	if (unlikely(num_enqueued < num_pkts)) {
-		G_LOG(ERR, "Failed to enqueue a bulk of %hu requests - only %u requests are enqueued\n",
-			num_pkts, num_enqueued);
+		G_LOG(ERR, "%s(): failed to enqueue a bulk of %hu requests - only %u requests are enqueued\n",
+			__func__, num_pkts, num_enqueued);
 	}
 
 	return num_enqueued;

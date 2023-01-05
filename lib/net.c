@@ -320,8 +320,8 @@ ipv4_pkt_filter_add(struct gatekeeper_if *iface, rte_be32_t dst_ip_be,
 			dst_port_be, dst_port_mask_be,
 			proto, queue_id);
 		if (ret < 0) {
-			G_LOG(NOTICE, "Cannot register IPv4 flow on the %s interface; falling back to software filters\n",
-				iface->name);
+			G_LOG(NOTICE, "%s(): cannot register IPv4 flow on the %s interface; falling back to software filters\n",
+				__func__, iface->name);
 			goto acl;
 		}
 		*rx_method |= RX_METHOD_NIC;
@@ -341,8 +341,8 @@ acl:
 	ret = register_ipv4_acl(&ipv4_rule,
 		cb_f, ext_cb_f, iface);
 	if (ret < 0) {
-		G_LOG(ERR, "Cannot register IPv4 ACL on the %s interface\n",
-			iface->name);
+		G_LOG(ERR, "%s(): cannot register IPv4 ACL on the %s interface\n",
+			__func__, iface->name);
 		return ret;
 	}
 	*rx_method |= RX_METHOD_MB;
@@ -410,8 +410,8 @@ ipv6_pkt_filter_add(struct gatekeeper_if *iface,
 	ret = register_ipv6_acl(&ipv6_rule,
 		cb_f, ext_cb_f, iface);
 	if (ret < 0) {
-		G_LOG(ERR, "Could not register IPv6 ACL on the %s interface\n",
-			iface->name);
+		G_LOG(ERR, "%s(): could not register IPv6 ACL on the %s interface\n",
+			__func__, iface->name);
 		return ret;
 	}
 	*rx_method |= RX_METHOD_MB;
@@ -1555,8 +1555,8 @@ gatekeeper_setup_user(struct net_config *net_conf, const char *user)
 	}
 
 	if ((pw = getpwnam(user)) == NULL) {
-		G_LOG(ERR, "%s: failed to call getpwnam() for user %s - %s\n",
-			__func__, user, strerror(errno));
+		G_LOG(ERR, "%s(): failed to call getpwnam() for user %s (errno=%i) - %s\n",
+			__func__, user, errno, strerror(errno));
 		return -1;
 	}
 
@@ -1576,10 +1576,10 @@ init_port(struct gatekeeper_if *iface, uint16_t port_id, int port_idx,
 	int ret = rte_eth_dev_configure(port_id, iface->num_rx_queues,
 		iface->num_tx_queues, port_conf);
 	if (ret < 0) {
-		G_LOG(ERR, "net: failed to configure port %hu (%s) on the %s interface (err=%d)\n",
+		G_LOG(ERR, "net: failed to configure port %hu (%s) on the %s interface (err=%d): %s\n",
 			port_id,
 			port_idx >= 0 ? iface->pci_addrs[port_idx] : "bonded",
-			iface->name, ret);
+			iface->name, ret, rte_strerror(-ret));
 		return ret;
 	}
 	return 0;
@@ -1728,8 +1728,8 @@ start_port(uint8_t port_id, uint8_t *pnum_succ_ports,
 	/* Start device. */
 	int ret = rte_eth_dev_start(port_id);
 	if (ret < 0) {
-		G_LOG(ERR, "net: failed to start port %hhu (err=%d)\n",
-			port_id, ret);
+		G_LOG(ERR, "net: failed to start port %hhu (err=%d): %s\n",
+			port_id, ret, rte_strerror(-ret));
 		return ret;
 	}
 	if (pnum_succ_ports != NULL)
@@ -1751,8 +1751,8 @@ start_port(uint8_t port_id, uint8_t *pnum_succ_ports,
 	do {
 		ret = rte_eth_link_get(port_id, &link);
 		if (ret < 0) {
-			G_LOG(ERR, "net: querying port %hhu failed with err - %s\n",
-				port_id, rte_strerror(-ret));
+			G_LOG(ERR, "net: querying port %hhu failed with err (errno=%i) - %s\n",
+				port_id, -ret, rte_strerror(-ret));
 			return ret;
 		}
 		RTE_VERIFY(ret == 0);
@@ -2100,14 +2100,14 @@ copy_amb_to_inh(cap_t cap_p)
 			old_errno = errno;
 			cap_name = cap_to_name(i);
 			if (cap_name == NULL) {
-				G_LOG(WARNING, "%s(): could not get string for capability %u (%s) while reporting that it is not supported by the running kernel (%s)\n",
-					__func__, i, strerror(errno),
-					strerror(old_errno));
+				G_LOG(WARNING, "%s(): could not get string for capability %u (errno=%i, %s) while reporting that it is not supported by the running kernel (errno=%i, %s)\n",
+					__func__, i, errno, strerror(errno),
+					old_errno, strerror(old_errno));
 				continue;
 			}
 
-			G_LOG(WARNING, "%s(): capability %s (%u) not supported by the running kernel: %s\n",
-				__func__, cap_name, i, strerror(old_errno));
+			G_LOG(WARNING, "%s(): capability %s (%u) not supported by the running kernel (errno=%i): %s\n",
+				__func__, cap_name, i, old_errno, strerror(old_errno));
 			cap_free(cap_name);
 			continue;
 		}
@@ -2118,15 +2118,15 @@ copy_amb_to_inh(cap_t cap_p)
 			old_errno = errno;
 			cap_name = cap_to_name(i);
 			if (cap_name == NULL) {
-				G_LOG(WARNING, "%s(): could not get string for capability %u (%s) while reporting that it could not be set to CAP_INHERITABLE (%s)\n",
-					__func__, i, strerror(errno),
-					strerror(old_errno));
+				G_LOG(WARNING, "%s(): could not get string for capability %u (errno=%i, %s) while reporting that it could not be set to CAP_INHERITABLE (errno=%i, %s)\n",
+					__func__, i, errno, strerror(errno),
+					old_errno, strerror(old_errno));
 				continue;
 			}
 
-			G_LOG(ERR, "%s(): could not set CAP_INHERITABLE to %u for capability %s (%u): %s\n",
+			G_LOG(ERR, "%s(): could not set CAP_INHERITABLE to %u for capability %s (%u) (errno=%i): %s\n",
 				__func__, value ? CAP_SET : CAP_CLEAR,
-				cap_name, i, strerror(old_errno));
+				cap_name, i, old_errno, strerror(old_errno));
 			cap_free(cap_name);
 			return -1;
 		}
@@ -2143,15 +2143,15 @@ log_proc_caps(const char *context)
 	int ret;
 
 	if (cap_p == NULL) {
-		G_LOG(ERR, "%s(): cannot get capabilities: %s\n",
-			__func__, strerror(errno));
+		G_LOG(ERR, "%s(): cannot get capabilities (errno=%i): %s\n",
+			__func__, errno, strerror(errno));
 		return;
 	}
 
 	cap_output = cap_to_text(cap_p, NULL);
 	if (cap_output == NULL) {
-		G_LOG(ERR, "%s(): cannot get text string of capabilities: %s\n",
-			__func__, strerror(errno));
+		G_LOG(ERR, "%s(): cannot get text string of capabilities (errno=%i): %s\n",
+			__func__, errno, strerror(errno));
 		goto proc;
 	}
 
@@ -2168,8 +2168,8 @@ log_proc_caps(const char *context)
 
 	amb_output = cap_to_text(cap_p, NULL);
 	if (amb_output == NULL) {
-		G_LOG(ERR, "%s(): cannot get text string of ambient capabilities: %s\n",
-			__func__, strerror(errno));
+		G_LOG(ERR, "%s(): cannot get text string of ambient capabilities (errno=%i): %s\n",
+			__func__, errno, strerror(errno));
 		goto cap;
 	}
 
@@ -2197,31 +2197,31 @@ needed_caps(int ncap, const cap_value_t *caps)
 
 	cap_p = cap_init();
 	if (cap_p == NULL) {
-		G_LOG(ERR, "%s(): could not create a capability state in working storage: %s\n",
-			__func__, strerror(errno));
+		G_LOG(ERR, "%s(): could not create a capability state in working storage (errno=%i): %s\n",
+			__func__, errno, strerror(errno));
 		return -1;
 	}
 
 	if (ncap > 0) {
 		ret = cap_set_flag(cap_p, CAP_PERMITTED, ncap, caps, CAP_SET);
 		if (ret != 0) {
-			G_LOG(ERR, "%s(): could not set CAP_PERMITTED for %d capabilities: %s\n",
-				__func__, ncap, strerror(errno));
+			G_LOG(ERR, "%s(): could not set CAP_PERMITTED for %d capabilities (errno=%i): %s\n",
+				__func__, ncap, errno, strerror(errno));
 			goto free;
 		}
 
 		ret = cap_set_flag(cap_p, CAP_EFFECTIVE, ncap, caps, CAP_SET);
 		if (ret != 0) {
-			G_LOG(ERR, "%s(): could not set CAP_EFFECTIVE for %d capabilities: %s\n",
-				__func__, ncap, strerror(errno));
+			G_LOG(ERR, "%s(): could not set CAP_EFFECTIVE for %d capabilities (errno=%i): %s\n",
+				__func__, ncap, errno, strerror(errno));
 			goto free;
 		}
 	}
 
 	ret = cap_set_proc(cap_p);
 	if (ret != 0) {
-		G_LOG(ERR, "%s(): could not set capabilities for process: %s\n",
-			__func__, strerror(errno));
+		G_LOG(ERR, "%s(): could not set capabilities for process (errno=%i): %s\n",
+			__func__, errno, strerror(errno));
 		goto free;
 	}
 free:
@@ -2233,8 +2233,8 @@ free:
 	if (CAP_AMBIENT_SUPPORTED()) {
 		ret = cap_reset_ambient();
 		if (ret != 0) {
-			G_LOG(ERR, "%s(): could not reset ambient capabilities: %s\n",
-				__func__, strerror(errno));
+			G_LOG(ERR, "%s(): could not reset ambient capabilities (errno=%i): %s\n",
+				__func__, errno, strerror(errno));
 		}
 	}
 
@@ -2253,7 +2253,7 @@ set_groups(const char *user, gid_t gid)
 	/* Fetch number of groups this user is a member of. */
 	ret = getgrouplist(user, gid, NULL, &num_gids);
 	if (ret != -1) {
-		G_LOG(ERR, "%s: getgrouplist indicates user %s is not in any groups, but belongs to at least %d\n",
+		G_LOG(ERR, "%s(): getgrouplist indicates user %s is not in any groups, but belongs to at least %d\n",
 			__func__, user, gid);
 		return -1;
 	}
@@ -2263,8 +2263,8 @@ set_groups(const char *user, gid_t gid)
 		/* User belongs to no groups. */
 		ret = cap_setgroups(gid, 0, NULL);
 		if (ret == -1) {
-			G_LOG(ERR, "%s: could not assign empty group set with cap_setgroups: %s\n",
-				__func__, strerror(errno));
+			G_LOG(ERR, "%s(): could not assign empty group set with cap_setgroups (errno=%i): %s\n",
+				__func__, errno, strerror(errno));
 			return -1;
 		}
 		return 0;
@@ -2272,7 +2272,7 @@ set_groups(const char *user, gid_t gid)
 
 	gids = rte_malloc("gids", num_gids * sizeof(*gids), 0);
 	if (gids == NULL) {
-		G_LOG(ERR, "%s: could not allocate memory for the %d groups of user %s\n",
+		G_LOG(ERR, "%s(): could not allocate memory for the %d groups of user %s\n",
 			__func__, num_gids, user);
 		return -1;
 	}
@@ -2280,7 +2280,7 @@ set_groups(const char *user, gid_t gid)
 	old_num_gids = num_gids;
 	ret = getgrouplist(user, gid, gids, &num_gids);
 	if (ret != old_num_gids) {
-		G_LOG(ERR, "%s: expected %d groups but received %d from getgrouplist\n",
+		G_LOG(ERR, "%s(): expected %d groups but received %d from getgrouplist\n",
 			__func__, old_num_gids, ret);
 		ret = -1;
 		goto free;
@@ -2288,8 +2288,8 @@ set_groups(const char *user, gid_t gid)
 
 	ret = cap_setgroups(gid, num_gids, gids);
 	if (ret == -1) {
-		G_LOG(ERR, "%s: could not set the groups of user %s with cap_setgroups: %s\n",
-			__func__, user, strerror(errno));
+		G_LOG(ERR, "%s(): could not set the groups of user %s with cap_setgroups (errno=%i): %s\n",
+			__func__, user, errno, strerror(errno));
 	}
 free:
 	rte_free(gids);
@@ -2305,20 +2305,20 @@ change_user(void)
 	errno = 0;
 	pw = getpwuid(config.pw_uid);
 	if (pw == NULL) {
-		G_LOG(ERR, "%s: failed to get the passwd struct for uid %u - %s\n",
-			__func__, config.pw_uid,
+		G_LOG(ERR, "%s(): failed to get the passwd struct for uid %u (errno=%i) - %s\n",
+			__func__, config.pw_uid, errno,
 			errno != 0 ? strerror(errno) : "user not found");
 		return -1;
 	}
 
-	G_LOG(DEBUG, "Ambient capabilities supported: %s\n",
-		CAP_AMBIENT_SUPPORTED() ? "yes" : "no");
+	G_LOG(DEBUG, "%s(): ambient capabilities supported: %s\n",
+		__func__, CAP_AMBIENT_SUPPORTED() ? "yes" : "no");
 
 	log_proc_caps("Capabilities before changing privileges");
 
 	ret = set_groups(pw->pw_name, config.pw_gid);
 	if (ret < 0) {
-		G_LOG(ERR, "%s: failed to set groups for user %s (gid %d)\n",
+		G_LOG(ERR, "%s(): failed to set groups for user %s (gid %d)\n",
 			__func__, pw->pw_name, config.pw_gid);
 		return -1;
 	}
@@ -2327,21 +2327,22 @@ change_user(void)
 
 	ret = cap_setuid(config.pw_uid);
 	if (ret != 0) {
-		G_LOG(ERR, "%s: failed to set UID for user %s (uid %d): %s\n",
-			__func__, pw->pw_name, config.pw_uid, strerror(errno));
+		G_LOG(ERR, "%s(): failed to set UID for user %s (uid %d) (errno=%i): %s\n",
+			__func__, pw->pw_name, config.pw_uid,
+			errno, strerror(errno));
 		return -1;
 	}
 
 	log_proc_caps("Capabilities after changing user");
 
 	if (seteuid(0) != -1) {
-		G_LOG(ERR, "%s: seteuid() was able to set the effective ID of a non-root user to root\n",
+		G_LOG(ERR, "%s(): seteuid() was able to set the effective ID of a non-root user to root\n",
 			__func__);
 		return -1;
 	}
 
 	if (setegid(0) != -1) {
-		G_LOG(ERR, "%s: setegid() was able to set the effective group ID of a non-root user to root\n",
+		G_LOG(ERR, "%s(): setegid() was able to set the effective group ID of a non-root user to root\n",
 			__func__);
 		return -1;
 	}
@@ -2378,9 +2379,9 @@ finalize_stage2(void *arg)
 		int log_fd = (intptr_t)arg;
 		ret = fchown(log_fd, config.pw_uid, config.pw_gid);
 		if (ret != 0) {
-			G_LOG(ERR, "Failed to change the owner of the file (with descriptor %d) to user with uid %u and gid %u - %s\n",
-				log_fd, config.pw_uid,
-				config.pw_gid, strerror(errno));
+			G_LOG(ERR, "%s(): failed to change the owner of the file (with descriptor %d) to user with uid %u and gid %u (errno=%i) - %s\n",
+				__func__, log_fd, config.pw_uid,
+				config.pw_gid, errno, strerror(errno));
 			return ret;
 		}
 
@@ -2458,7 +2459,7 @@ gatekeeper_init_network(struct net_config *net_conf)
 	net_conf->numa_used = rte_calloc("numas", net_conf->numa_nodes,
 		sizeof(*net_conf->numa_used), 0);
 	if (net_conf->numa_used == NULL) {
-		G_LOG(ERR, "net: %s: out of memory for NUMA used array\n",
+		G_LOG(ERR, "net: %s(): out of memory for NUMA used array\n",
 			__func__);
 		return -1;
 	}

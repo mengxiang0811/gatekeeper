@@ -45,7 +45,8 @@ drop_unmatched_pkts(struct rte_mbuf **pkts, unsigned int num_pkts,
 		 */
 		if (unlikely(G_LOG_CHECK(DEBUG))) {
 			G_LOG(DEBUG,
-				"acl: a packet failed to match any ACL rules, the whole packet is dumped below:\n");
+				"%s(%s): acl: a packet failed to match any ACL rules, the whole packet is dumped below:\n",
+				__func__, iface->name);
 			rte_pktmbuf_dump(log_file, pkts[i], pkts[i]->pkt_len);
 		}
 		rte_pktmbuf_free(pkts[i]);
@@ -76,8 +77,8 @@ process_acl(struct gatekeeper_if *iface, unsigned int lcore_id,
 		acl->data, res, acl->num, 1);
 	if (unlikely(ret < 0)) {
 		G_LOG(ERR,
-			"acl: invalid arguments given to %s rte_acl_classify()\n",
-			proto_name);
+			"%s(%s): acl: invalid arguments given to %s rte_acl_classify()\n",
+			__func__, iface->name, proto_name);
 		goto drop_acl_pkts;
 	}
 
@@ -119,8 +120,8 @@ process_acl(struct gatekeeper_if *iface, unsigned int lcore_id,
 			 * freeing packets not already handled.
 			 */
 			G_LOG(WARNING,
-				"acl: %s ACL function %d failed on %s iface\n",
-				proto_name, i, iface->name);
+				"%s(): acl: %s ACL function %d failed on %s iface\n",
+				__func__, proto_name, i, iface->name);
 		}
 	}
 
@@ -237,14 +238,15 @@ register_cb_fs(struct acl_state *acls, acl_cb_func cb_f, ext_cb_func ext_cb_f)
 		if (acls->ext_funcs[i] == ext_cb_f) {
 			if (acls->funcs[i] == cb_f)
 				return i;
-			G_LOG(ERR, "acl: an extension callback function is being used twice, but has different callback functions associated to it\n");
+			G_LOG(ERR, "%s(): acl: an extension callback function is being used twice, but has different callback functions associated to it\n",
+				__func__);
 			return -1;
 		}
 	}
 
 new_type:
 	if (func_count >= GATEKEEPER_ACL_MAX) {
-		G_LOG(ERR, "acl: cannot install more ACL types\n");
+		G_LOG(ERR, "%s(): acl: cannot install more ACL types\n", __func__);
 		return -1;
 	}
 
@@ -276,8 +278,8 @@ register_ipv4_acl(struct ipv4_acl_rule *ipv4_rule,
 	int index = register_cb_fs(&iface->ipv4_acls, cb_f, ext_cb_f);
 
 	if (index < 0) {
-		G_LOG(ERR, "acl: cannot add IPv4 ACL type on interface %s\n",
-			iface->name);
+		G_LOG(ERR, "%s(): acl: cannot add IPv4 ACL type on interface %s\n",
+			__func__, iface->name);
 		return -1;
 	}
 
@@ -293,8 +295,8 @@ register_ipv4_acl(struct ipv4_acl_rule *ipv4_rule,
 		ret = rte_acl_add_rules(iface->ipv4_acls.acls[i],
 			(struct rte_acl_rule *)ipv4_rule, 1);
 		if (ret < 0) {
-			G_LOG(ERR, "acl: failed to add IPv4 ACL rule on interface %s on socket %d\n",
-				iface->name, i);
+			G_LOG(ERR, "%s(): acl: failed to add IPv4 ACL rule on interface %s on socket %d\n",
+				__func__, iface->name, i);
 			return ret;
 		}
 	}
@@ -324,8 +326,8 @@ build_ipv4_acls(struct gatekeeper_if *iface)
 			&acl_build_params);
 		if (ret < 0) {
 			G_LOG(ERR,
-				"acl: failed to build IPv4 ACL for the %s iface\n",
-				iface->name);
+				"%s(): acl: failed to build IPv4 ACL for the %s iface\n",
+				__func__, iface->name);
 			return ret;
 		}
 	}
@@ -360,8 +362,8 @@ init_ipv4_acls(struct gatekeeper_if *iface)
 		if (iface->ipv4_acls.acls[i] == NULL) {
 			unsigned int j;
 
-			G_LOG(ERR, "acl: failed to create IPv4 ACL for the %s iface on socket %d\n",
-				iface->name, i);
+			G_LOG(ERR, "%s(): acl: failed to create IPv4 ACL for the %s iface on socket %d\n",
+				__func__, iface->name, i);
 			for (j = 0; j < i; j++) {
 				rte_acl_free(iface->ipv4_acls.acls[i]);
 				iface->ipv4_acls.acls[i] = NULL;
@@ -498,8 +500,8 @@ register_ipv6_acl(struct ipv6_acl_rule *ipv6_rule,
 	int index = register_cb_fs(&iface->ipv6_acls, cb_f, ext_cb_f);
 
 	if (index < 0) {
-		G_LOG(ERR, "acl: cannot add IPv6 ACL type on interface %s\n",
-			iface->name);
+		G_LOG(ERR, "%s(): acl: cannot add IPv6 ACL type on interface %s\n",
+			__func__, iface->name);
 		return -1;
 	}
 
@@ -515,8 +517,8 @@ register_ipv6_acl(struct ipv6_acl_rule *ipv6_rule,
 		ret = rte_acl_add_rules(iface->ipv6_acls.acls[i],
 			(struct rte_acl_rule *)ipv6_rule, 1);
 		if (ret < 0) {
-			G_LOG(ERR, "acl: failed to add IPv6 ACL rule on interface %s on socket %d\n",
-				iface->name, i);
+			G_LOG(ERR, "%s(): acl: failed to add IPv6 ACL rule on interface %s on socket %d\n",
+				__func__, iface->name, i);
 			return ret;
 		}
 	}
@@ -546,8 +548,8 @@ build_ipv6_acls(struct gatekeeper_if *iface)
 			&acl_build_params);
 		if (ret < 0) {
 			G_LOG(ERR,
-				"acl: failed to build IPv6 ACL for the %s iface\n",
-				iface->name);
+				"%s(): acl: failed to build IPv6 ACL for the %s iface\n",
+				__func__, iface->name);
 			return ret;
 		}
 	}
@@ -582,8 +584,8 @@ init_ipv6_acls(struct gatekeeper_if *iface)
 		if (iface->ipv6_acls.acls[i] == NULL) {
 			unsigned int j;
 
-			G_LOG(ERR, "acl: failed to create IPv6 ACL for the %s iface on socket %d\n",
-				iface->name, i);
+			G_LOG(ERR, "%s(): acl: failed to create IPv6 ACL for the %s iface on socket %d\n",
+				__func__, iface->name, i);
 			for (j = 0; j < i; j++) {
 				rte_acl_free(iface->ipv6_acls.acls[i]);
 				iface->ipv6_acls.acls[i] = NULL;

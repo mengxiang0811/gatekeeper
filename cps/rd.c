@@ -83,7 +83,7 @@ rd_event_sock_open(struct cps_config *cps_conf)
 
 	nl = mnl_socket_open(NETLINK_ROUTE);
 	if (nl == NULL) {
-		G_LOG(ERR, "%s: mnl_socket_open: %s\n",
+		G_LOG(ERR, "%s(): mnl_socket_open: %s\n",
 			__func__, strerror(errno));
 		return -1;
 	}
@@ -95,7 +95,7 @@ rd_event_sock_open(struct cps_config *cps_conf)
 	 */
 	ret = mnl_socket_bind(nl, 0, cps_conf->nl_pid);
 	if (ret < 0) {
-		G_LOG(ERR, "%s: mnl_socket_bind: %s\n",
+		G_LOG(ERR, "%s(): mnl_socket_bind: %s\n",
 			__func__, strerror(errno));
 		goto close;
 	}
@@ -177,8 +177,8 @@ can_rd_del_route(struct route_update *update, struct gk_fib *prefix_fib)
 	 */
 	if (prefix_fib->action == GK_FWD_GRANTOR) {
 		G_LOG(ERR,
-			"Prefix %s cannot be updated via RTNetlink because it is a grantor entry; use the dynamic configuration block to update grantor entries\n",
-			update->prefix_info.str);
+			"%s(): prefix %s cannot be updated via RTNetlink because it is a grantor entry; use the dynamic configuration block to update grantor entries\n",
+			__func__, update->prefix_info.str);
 		return -EPERM;
 	}
 
@@ -632,8 +632,8 @@ rd_send_err(const struct nlmsghdr *req, struct cps_config *cps_conf, int err)
 			rep, sizeof(*rep) + errmsg_len,
 			(struct sockaddr *)&rd_sa, sizeof(rd_sa),
 			cps_conf) < 0) {
-		G_LOG(ERR, "sendto_with_yield: cannot send NLMSG_ERROR to daemon (pid=%u seq=%u): %s\n",
-			req->nlmsg_pid, req->nlmsg_seq, strerror(errno));
+		G_LOG(ERR, "sendto_with_yield: cannot send NLMSG_ERROR to daemon (pid=%u seq=%u) (errno=%i): %s\n",
+			req->nlmsg_pid, req->nlmsg_seq, errno, strerror(errno));
 	}
 }
 
@@ -778,8 +778,8 @@ rd_send_batch(struct cps_config *cps_conf, struct mnl_nlmsg_batch *batch,
 			cps_conf) < 0) {
 		ret = -errno;
 		G_LOG(ERR,
-			"sendto_with_yield: cannot dump route batch to %s daemon (pid=%u seq=%u): %s\n",
-			daemon, pid, seq, strerror(errno));
+			"sendto_with_yield: cannot dump route batch to %s daemon (pid=%u seq=%u) (errno=%i): %s\n",
+			daemon, pid, seq, errno, strerror(errno));
 	}
 
 	mnl_nlmsg_batch_reset(batch);
@@ -940,7 +940,8 @@ rd_getroute(const struct nlmsghdr *req, struct cps_config *cps_conf, int *err)
 
 	batch = mnl_nlmsg_batch_start(buf, MNL_SOCKET_BUFFER_SIZE);
 	if (batch == NULL) {
-		G_LOG(ERR, "Failed to allocate a batch for a GETROUTE reply\n");
+		G_LOG(ERR, "%s(): failed to allocate a batch for a GETROUTE reply\n",
+			__func__);
 		*err = -ENOMEM;
 		goto out;
 	}
@@ -1021,7 +1022,8 @@ rd_getlink(const struct nlmsghdr *req, struct cps_config *cps_conf, int *err)
 
 	batch = mnl_nlmsg_batch_start(buf, MNL_SOCKET_BUFFER_SIZE);
 	if (batch == NULL) {
-		G_LOG(ERR, "Failed to allocate a batch for a GETLINK reply\n");
+		G_LOG(ERR, "%s(): failed to allocate a batch for a GETLINK reply\n",
+			__func__);
 		*err = -ENOMEM;
 		goto out;
 	}
@@ -1073,7 +1075,8 @@ rd_modroute(const struct nlmsghdr *req, struct cps_config *cps_conf, int *err)
 		 * shouldn't be receiving route updates.
 		 */
 		G_LOG(WARNING,
-			"The system is running as Grantor, and there shouldn't be any rtnetlink message processed under this configuration while receiving route update messages\n");
+			"%s(): the system is running as Grantor, and there shouldn't be any rtnetlink message processed under this configuration while receiving route update messages\n",
+			__func__);
 		*err = -EOPNOTSUPP;
 		goto out;
 	}
@@ -1131,8 +1134,8 @@ rd_modroute(const struct nlmsghdr *req, struct cps_config *cps_conf, int *err)
 			goto out;
 		break;
 	default:
-		G_LOG(NOTICE, "Unrecognized family in netlink event: %u\n",
-			rm->rtm_family);
+		G_LOG(NOTICE, "%s(): unrecognized family in netlink event: %u\n",
+			__func__, rm->rtm_family);
 		*err = -EAFNOSUPPORT;
 		goto out;
 	}
@@ -1143,8 +1146,8 @@ rd_modroute(const struct nlmsghdr *req, struct cps_config *cps_conf, int *err)
 		} else if (likely(update.type == RTM_DELROUTE)) {
 			*err = del_route(&update, cps_conf);
 		} else {
-			G_LOG(WARNING, "Receiving an unexpected update rule with type = %d\n",
-				update.type);
+			G_LOG(WARNING, "%s(): receiving an unexpected update rule with type = %d\n",
+				__func__, update.type);
 			*err = -EOPNOTSUPP;
 		}
 	} else
@@ -1269,7 +1272,8 @@ rd_getaddr(const struct nlmsghdr *req, struct cps_config *cps_conf, int *err)
 
 	batch = mnl_nlmsg_batch_start(buf, MNL_SOCKET_BUFFER_SIZE);
 	if (batch == NULL) {
-		G_LOG(ERR, "Failed to allocate a batch for a GETADDR reply\n");
+		G_LOG(ERR, "%s(): failed to allocate a batch for a GETADDR reply\n",
+			__func__);
 		*err = -ENOMEM;
 		goto out;
 	}
@@ -1325,8 +1329,8 @@ rd_cb(const struct nlmsghdr *req, void *arg)
 		ret = rd_getaddr(req, cps_conf, &err);
 		break;
 	default:
-		G_LOG(NOTICE, "Unrecognized netlink message type: %u\n",
-			req->nlmsg_type);
+		G_LOG(NOTICE, "%s(): unrecognized netlink message type: %u\n",
+			__func__, req->nlmsg_type);
 		err = -EOPNOTSUPP;
 		break;
 	}
@@ -1392,8 +1396,8 @@ __rd_process_events(struct cps_config *cps_conf)
 			sizeof(buf), MSG_DONTWAIT);
 		if (ret == -1) {
 			if (errno != EAGAIN && errno != EWOULDBLOCK)
-				G_LOG(ERR, "%s: recv: %s\n",
-					__func__, strerror(errno));
+				G_LOG(ERR, "%s(): recv (errno=%i): %s\n",
+					__func__, errno, strerror(errno));
 			break;
 		}
 
@@ -1426,7 +1430,8 @@ rd_alloc_coro(struct cps_config *cps_conf)
 
 	if (unlikely(coro_stack_alloc(&cps_conf->coro_rd_stack, stack_size_ptr)
 			!= 1)) {
-		G_LOG(ERR, "Failed to allocate stack for RD coroutine\n");
+		G_LOG(ERR, "%s(): failed to allocate stack for RD coroutine\n",
+			__func__);
 		return -1;
 	}
 

@@ -390,7 +390,8 @@ config_gatekeeper(const char *lua_base_dir, const char *gatekeeper_config_file)
 
 	lua_state = luaL_newstate();
 	if (!lua_state) {
-		G_LOG(ERR, "config: failed to create new Lua state\n");
+		G_LOG(ERR, "config: %s(): failed to create new Lua state\n",
+			__func__);
 		return -1;
 	}
 
@@ -399,7 +400,8 @@ config_gatekeeper(const char *lua_base_dir, const char *gatekeeper_config_file)
 	set_lua_path(lua_state, lua_base_dir);
 	ret = luaL_loadfile(lua_state, lua_entry_path);
 	if (ret != 0) {
-		G_LOG(ERR, "config: %s\n", lua_tostring(lua_state, -1));
+		G_LOG(ERR, "config: %s(): %s\n",
+			__func__, lua_tostring(lua_state, -1));
 		ret = -1;
 		goto out;
 	}
@@ -416,7 +418,8 @@ config_gatekeeper(const char *lua_base_dir, const char *gatekeeper_config_file)
 	 */
 	ret = lua_pcall(lua_state, 0, 0, 0);
 	if (ret != 0) {
-		G_LOG(ERR, "config: %s\n", lua_tostring(lua_state, -1));
+		G_LOG(ERR, "config: %s(): %s\n",
+			__func__, lua_tostring(lua_state, -1));
 		ret = -1;
 		goto out;
 	}
@@ -425,7 +428,8 @@ config_gatekeeper(const char *lua_base_dir, const char *gatekeeper_config_file)
 	lua_getglobal(lua_state, "gatekeeper_init");
 	ret = lua_pcall(lua_state, 0, 1, 0);
 	if (ret != 0) {
-		G_LOG(ERR, "config: %s\n", lua_tostring(lua_state, -1));
+		G_LOG(ERR, "config: %s(): %s\n",
+			__func__, lua_tostring(lua_state, -1));
 		ret = -1;
 		goto out;
 	}

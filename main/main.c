@@ -421,7 +421,7 @@ main(int argc, char **argv)
 
 	ret = config_gatekeeper(args.lua_base_dir, args.gatekeeper_config_file);
 	if (ret < 0) {
-		G_LOG(ERR, "Failed to configure Gatekeeper\n");
+		G_LOG(ERR, "%s(): failed to configure Gatekeeper\n", __func__);
 		goto net;
 	}
 

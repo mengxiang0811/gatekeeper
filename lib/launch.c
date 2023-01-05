@@ -51,7 +51,7 @@ launch_at_stage1(lcore_function_t *f, void *arg)
 
 	entry = rte_malloc(__func__, sizeof(*entry), 0);
 	if (entry == NULL) {
-		G_LOG(ERR, "launch: %s: DPDK ran out of memory", __func__);
+		G_LOG(ERR, "launch: %s(): DPDK ran out of memory", __func__);
 		return -1;
 	}
 
@@ -103,7 +103,7 @@ launch_at_stage2(lcore_function_t *f, void *arg)
 
 	entry = rte_malloc(__func__, sizeof(*entry), 0);
 	if (entry == NULL) {
-		G_LOG(ERR, "launch: %s: DPDK ran out of memory", __func__);
+		G_LOG(ERR, "launch: %s(): DPDK ran out of memory", __func__);
 		return -1;
 	}
 
@@ -163,7 +163,7 @@ launch_at_stage3(const char *name, lcore_function_t *f, void *arg,
 
 	entry = rte_malloc(__func__, sizeof(*entry), 0);
 	if (entry == NULL) {
-		G_LOG(ERR, "launch: %s: DPDK ran out of memory", __func__);
+		G_LOG(ERR, "launch: %s(): DPDK ran out of memory", __func__);
 		goto name_cpy;
 	}
 
@@ -210,8 +210,8 @@ launch_stage3(void)
 		ret = rte_eal_remote_launch(entry->f, entry->arg,
 			entry->lcore_id);
 		if (ret != 0) {
-			G_LOG(ERR, "launch: lcore %u failed to launch %s\n",
-				entry->lcore_id, entry->name);
+			G_LOG(ERR, "launch: %s(): lcore %u failed to launch %s\n",
+				__func__, entry->lcore_id, entry->name);
 			return ret;
 		}
 		list_del(&entry->list);
@@ -234,14 +234,15 @@ run_main_if_applicable(void)
 		return 0;
 
 	if (!list_is_singular(&launch_heads.stage3)) {
-		G_LOG(ERR, "launch: list of stage 3 functions should not contain multiple main lcore entries\n");
+		G_LOG(ERR, "launch: %s(): list of stage 3 functions should not contain multiple main lcore entries\n",
+			__func__);
 		return -1;
 	}
 
 	first = list_first_entry(&launch_heads.stage3, struct stage3_entry,
 		list);
 	if (first->lcore_id != main_id) {
-		G_LOG(ERR, "launch: list of stage 3 functions should not contain non-main lcore entries in %s\n",
+		G_LOG(ERR, "launch: list of stage 3 functions should not contain non-main lcore entries in %s()\n",
 			__func__);
 		return -1;
 	}

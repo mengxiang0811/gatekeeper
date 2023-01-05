@@ -42,12 +42,12 @@ log_unknown_l2(const char *name, uint16_t ether_type)
 	 */
 	if (ether_type < ETHERNET_II_ETHERTYPES) {
 		G_LOG(DEBUG,
-			"l2: %s: invalid Ethernet field or frame not Ethernet II:%" PRIu16 "\n",
-			name, ether_type);
+			"l2: %s(): %s: invalid Ethernet field or frame not Ethernet II:%" PRIu16 "\n",
+			__func__, name, ether_type);
 	} else {
 		G_LOG(NOTICE,
-			"l2: %s: unknown EtherType %" PRIu16 "\n",
-			name, ether_type);
+			"l2: %s(): %s: unknown EtherType %" PRIu16 "\n",
+			__func__, name, ether_type);
 	}
 }
 

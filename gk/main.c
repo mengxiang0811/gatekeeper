@@ -80,7 +80,8 @@ priority_from_delta_time(uint64_t present, uint64_t past)
 		 * This should never happen, but we handle it gracefully here 
 		 * in order to keep going.
 		 */
-		G_LOG(ERR, "The present time smaller than the past time\n");
+		G_LOG(ERR, "%s(): the present time smaller than the past time\n",
+			__func__);
 		return 0;
 	}
 
@@ -112,8 +113,8 @@ extract_packet_info(struct rte_mbuf *pkt, struct ipacket *packet)
 		if (pkt_len < ether_len + sizeof(*ip4_hdr)) {
 			packet->flow.proto = 0;
 			G_LOG(NOTICE,
-				"Packet is too short to be IPv4 (%" PRIu16 ")\n",
-				pkt_len);
+				"%s(): packet is too short to be IPv4 (%" PRIu16 ")\n",
+				__func__, pkt_len);
 			ret = -1;
 			goto out;
 		}
@@ -128,8 +129,8 @@ extract_packet_info(struct rte_mbuf *pkt, struct ipacket *packet)
 		if (pkt_len < ether_len + sizeof(*ip6_hdr)) {
 			packet->flow.proto = 0;
 			G_LOG(NOTICE,
-				"Packet is too short to be IPv6 (%" PRIu16 ")\n",
-				pkt_len);
+				"%s(): packet is too short to be IPv6 (%" PRIu16 ")\n",
+				__func__, pkt_len);
 			ret = -1;
 			goto out;
 		}
@@ -474,8 +475,8 @@ gk_process_bpf(struct flow_entry *fe, struct ipacket *packet,
 		&bpf_ret);
 	if (unlikely(rc != 0)) {
 		G_LOG(WARNING,
-			"The BPF program at index %u failed to run its function pkt\n",
-			program_index);
+			"%s(): the BPF program at index %u failed to run its function pkt\n",
+			__func__, program_index);
 		goto expired;
 	}
 
@@ -502,13 +503,13 @@ gk_process_bpf(struct flow_entry *fe, struct ipacket *packet,
 		return -1;
 	case GK_BPF_PKT_RET_ERROR:
 		G_LOG(WARNING,
-			"The function pkt of the BPF program at index %u returned GK_BPF_PKT_RET_ERROR\n",
-			program_index);
+			"%s(): the function pkt of the BPF program at index %u returned GK_BPF_PKT_RET_ERROR\n",
+			__func__, program_index);
 		return -1;
 	default:
 		G_LOG(WARNING,
-			"The function pkt of the BPF program at index %u returned an invalid return: %" PRIu64 "\n",
-			program_index, bpf_ret);
+			"%s(): the function pkt of the BPF program at index %u returned an invalid return: %" PRIu64 "\n",
+			__func__, program_index, bpf_ret);
 		return -1;
 	}
 
@@ -920,8 +921,8 @@ setup_gk_instance(unsigned int lcore_id, struct gk_config *gk_conf)
 	instance->ip_flow_hash_table = rte_hash_create(&ip_flow_hash_params);
 	if (instance->ip_flow_hash_table == NULL) {
 		G_LOG(ERR,
-			"The GK block cannot create hash table at lcore %u\n",
-			lcore_id);
+			"%s(): the GK block cannot create hash table at lcore %u\n",
+			__func__, lcore_id);
 
 		ret = -1;
 		goto out;
@@ -934,8 +935,8 @@ setup_gk_instance(unsigned int lcore_id, struct gk_config *gk_conf)
 		NULL, gk_conf->flow_ht_size, sizeof(struct flow_entry), 0, socket_id);
 	if (instance->ip_flow_entry_table == NULL) {
 		G_LOG(ERR,
-			"The GK block can't create flow entry table at lcore %u\n",
-			lcore_id);
+			"%s(): the GK block can't create flow entry table at lcore %u\n",
+			__func__, lcore_id);
 
 		ret = -1;
 		goto flow_hash;
@@ -1021,8 +1022,8 @@ flush_flow_table(struct gk_instance *instance, test_flow_entry_t test,
 			&key, &data, &next);
 	}
 
-	G_LOG(NOTICE, "Flushed %" PRIu64 " flows of the flow table due to %s\n",
-		num_flushed_flows, context);
+	G_LOG(NOTICE, "%s(): flushed %" PRIu64 " flows of the flow table due to %s\n",
+		__func__, num_flushed_flows, context);
 }
 
 struct flush_net_prefixes {
@@ -1210,7 +1211,8 @@ process_gk_cmd(struct gk_cmd_entry *entry, struct gk_add_policy **policies,
 		break;
 
 	default:
-		G_LOG(ERR, "Unknown command operation %u\n", entry->op);
+		G_LOG(ERR, "%s(): unknown command operation %u\n",
+			__func__, entry->op);
 		break;
 	}
 }
@@ -1282,7 +1284,7 @@ xmit_icmp(struct gatekeeper_if *iface, struct ipacket *packet,
 		int ret = rte_pktmbuf_trim(pkt, pkt->data_len - icmp_pkt_len);
 		if (ret < 0) {
 			G_LOG(ERR,
-				"Failed to remove %d bytes of data at the end of the mbuf at %s",
+				"Failed to remove %d bytes of data at the end of the mbuf at %s()",
 				pkt->data_len - icmp_pkt_len, __func__);
 			cb_f(pkt, instance);
 			return;
@@ -1294,7 +1296,7 @@ xmit_icmp(struct gatekeeper_if *iface, struct ipacket *packet,
 			icmp_pkt_len - pkt->data_len);
 		if (icmp_eth == NULL) {
 			G_LOG(ERR,
-				"Failed to append %d bytes of new data: not enough headroom space in the first segment at %s\n",
+				"Failed to append %d bytes of new data: not enough headroom space in the first segment at %s()\n",
 				icmp_pkt_len - pkt->data_len, __func__);
 			cb_f(pkt, instance);
 			return;
@@ -1355,7 +1357,7 @@ xmit_icmpv6(struct gatekeeper_if *iface, struct ipacket *packet,
 			pkt->data_len - icmpv6_pkt_len);
 		if (ret < 0) {
 			G_LOG(ERR,
-				"Failed to remove %d bytes of data at the end of the mbuf at %s",
+				"Failed to remove %d bytes of data at the end of the mbuf at %s()",
 				pkt->data_len - icmpv6_pkt_len, __func__);
 			cb_f(pkt, instance);
 			return;
@@ -1367,7 +1369,7 @@ xmit_icmpv6(struct gatekeeper_if *iface, struct ipacket *packet,
 			icmpv6_pkt_len - pkt->data_len);
 		if (icmp_eth == NULL) {
 			G_LOG(ERR,
-				"Failed to append %d bytes of new data: not enough headroom space in the first segment at %s\n",
+				"Failed to append %d bytes of new data: not enough headroom space in the first segment at %s()\n",
 				icmpv6_pkt_len - pkt->data_len, __func__);
 			cb_f(pkt, instance);
 			return;
@@ -1454,7 +1456,7 @@ update_ip_hop_count(struct gatekeeper_if *iface, struct ipacket *packet,
 		--(ipv6_hdr->hop_limits);
 	} else {
 		G_LOG(WARNING,
-			"Unexpected condition at %s: unknown flow type %hu\n",
+			"Unexpected condition at %s(): unknown flow type %hu\n",
 			__func__, packet->flow.proto);
 		cb_f(packet->pkt, instance);
 		return -EINVAL;
@@ -1964,8 +1966,10 @@ process_pkts_front(uint16_t port_front, uint16_t rx_queue_front,
 			(const void **)&flow_arr[done_lookups],
 			(hash_sig_t *)&flow_hash_val_arr[done_lookups],
 			num_keys, &pos_arr[done_lookups]);
-		if (ret != 0)
-			G_LOG(NOTICE, "Failed to find multiple keys in the hash table\n");
+		if (ret != 0) {
+			G_LOG(NOTICE, "%s(): failed to find multiple keys in the hash table\n",
+				__func__);
+		}
 
 		done_lookups += num_keys;
 	}
@@ -2436,8 +2440,10 @@ add_ggu_policy_bulk(struct gk_add_policy **policies, int num_policies,
 			(const void **)&flow_arr[done_lookups],
 			&flow_hash_val_arr[done_lookups],
 			num_keys, &pos_arr[done_lookups]);
-		if (ret != 0)
-			G_LOG(NOTICE, "Failed to find multiple keys in the hash table\n");
+		if (ret != 0) {
+			G_LOG(NOTICE, "%s(): failed to find multiple keys in the hash table\n",
+				__func__);
+		}
 
 		done_lookups += num_keys;
 	}
@@ -2588,8 +2594,8 @@ log_no_time:
 	strcpy(str_date_time, "NO TIME");
 log:
 	G_LOG(NOTICE,
-		"Basic measurements at %s [tot_pkts_num = %"PRIu64", tot_pkts_size = %"PRIu64", pkts_num_granted = %"PRIu64", pkts_size_granted = %"PRIu64", pkts_num_request = %"PRIu64", pkts_size_request =  %"PRIu64", pkts_num_declined = %"PRIu64", pkts_size_declined =  %"PRIu64", tot_pkts_num_dropped = %"PRIu64", tot_pkts_size_dropped =  %"PRIu64", tot_pkts_num_distributed = %"PRIu64", tot_pkts_size_distributed =  %"PRIu64"]\n",
-		str_date_time,
+		"%s(): basic measurements at %s [tot_pkts_num = %"PRIu64", tot_pkts_size = %"PRIu64", pkts_num_granted = %"PRIu64", pkts_size_granted = %"PRIu64", pkts_num_request = %"PRIu64", pkts_size_request =  %"PRIu64", pkts_num_declined = %"PRIu64", pkts_size_declined =  %"PRIu64", tot_pkts_num_dropped = %"PRIu64", tot_pkts_size_dropped =  %"PRIu64", tot_pkts_num_distributed = %"PRIu64", tot_pkts_size_distributed =  %"PRIu64"]\n",
+		__func__, str_date_time,
 		stats->tot_pkts_num,
 		stats->tot_pkts_size,
 		stats->pkts_num_granted,
@@ -2636,7 +2642,8 @@ gk_proc(void *arg)
 	G_LOG(NOTICE, "The GK block is running at tid = %u\n", gettid());
 
 	if (needed_caps(0, NULL) < 0) {
-		G_LOG(ERR, "Could not set needed capabilities\n");
+		G_LOG(ERR, "%s(): could not set needed capabilities\n",
+			__func__);
 		exiting = true;
 	}
 
@@ -2848,8 +2855,8 @@ gk_stage1(void *arg)
 		ret = get_queue_id(&gk_conf->net->front, QUEUE_TYPE_RX, lcore,
 			inst_ptr->mp);
 		if (ret < 0) {
-			G_LOG(ERR, "Cannot assign an RX queue for the front interface for lcore %u\n",
-				lcore);
+			G_LOG(ERR, "%s(%s): cannot assign an RX queue for the front interface for lcore %u\n",
+				__func__, gk_conf->net->front.name, lcore);
 			goto cleanup;
 		}
 		inst_ptr->rx_queue_front = ret;
@@ -2858,8 +2865,8 @@ gk_stage1(void *arg)
 		ret = get_queue_id(&gk_conf->net->front, QUEUE_TYPE_TX, lcore,
 			NULL);
 		if (ret < 0) {
-			G_LOG(ERR, "Cannot assign a TX queue for the front interface for lcore %u\n",
-				lcore);
+			G_LOG(ERR, "%s(%s): cannot assign a TX queue for the front interface for lcore %u\n",
+				__func__, gk_conf->net->front.name, lcore);
 			goto cleanup;
 		}
 		inst_ptr->tx_queue_front = ret;
@@ -2867,8 +2874,8 @@ gk_stage1(void *arg)
 		ret = get_queue_id(&gk_conf->net->back, QUEUE_TYPE_RX, lcore,
 			inst_ptr->mp);
 		if (ret < 0) {
-			G_LOG(ERR, "Cannot assign an RX queue for the back interface for lcore %u\n",
-				lcore);
+			G_LOG(ERR, "%s(%s): cannot assign an RX queue for the back interface for lcore %u\n",
+				__func__, gk_conf->net->back.name, lcore);
 			goto cleanup;
 		}
 		inst_ptr->rx_queue_back = ret;
@@ -2876,15 +2883,15 @@ gk_stage1(void *arg)
 		ret = get_queue_id(&gk_conf->net->back, QUEUE_TYPE_TX, lcore,
 			NULL);
 		if (ret < 0) {
-			G_LOG(ERR, "Cannot assign a TX queue for the back interface for lcore %u\n",
-				lcore);
+			G_LOG(ERR, "%s(%s): cannot assign a TX queue for the back interface for lcore %u\n",
+				__func__, gk_conf->net->back.name, lcore);
 			goto cleanup;
 		}
 		inst_ptr->tx_queue_back = ret;
 
 		if (gk_conf->gk_sol_map[i] >= (unsigned int)sol_conf->num_lcores) {
-			G_LOG(ERR, "Invalid index (%u) of sol_conf->instances[] for lcore %u\n",
-				gk_conf->gk_sol_map[i], lcore);
+			G_LOG(ERR, "%s(): invalid index (%u) of sol_conf->instances[] for lcore %u\n",
+				__func__, gk_conf->gk_sol_map[i], lcore);
 			goto cleanup;
 		}
 
@@ -2894,8 +2901,8 @@ gk_stage1(void *arg)
 		ret = setup_gk_instance(lcore, gk_conf);
 		if (ret < 0) {
 			G_LOG(ERR,
-				"Failed to setup gk instances for GK block at lcore %u\n",
-				lcore);
+				"%s(): failed to setup gk instances for GK block at lcore %u\n",
+				__func__, lcore);
 			goto cleanup;
 		}
 	}
@@ -2942,7 +2949,7 @@ run_gk(struct net_config *net_conf, struct gk_config *gk_conf,
 	}
 
 	if (!net_conf->back_iface_enabled) {
-		G_LOG(ERR, "Back interface is required\n");
+		G_LOG(ERR, "%s(): back interface is required\n", __func__);
 		ret = -1;
 		goto out;
 	}
@@ -2954,7 +2961,8 @@ run_gk(struct net_config *net_conf, struct gk_config *gk_conf,
 	}
 
 	if (gk_conf->gk_sol_map == NULL) {
-		G_LOG(ERR, "GK-to-SOL mapping is required for initialization\n");
+		G_LOG(ERR, "%s(): GK-to-SOL mapping is required for initialization\n",
+			__func__);
 		ret = -1;
 		goto out;
 	}
@@ -3033,8 +3041,11 @@ get_responsible_gk_mailbox(uint32_t flow_hash_val,
 	queue_id = gk_conf->rss_conf_front.reta_conf[idx].reta[shift];
 	block_idx = gk_conf->queue_id_to_instance[queue_id];
 
-	if (block_idx == -1)
-		G_LOG(ERR, "Wrong RSS configuration for GK blocks\n");
+	if (block_idx == -1) {
+		G_LOG(ERR, "%s(): wrong RSS configuration for GK blocks\n",
+			__func__);
+	}
+
 done:
 	return &gk_conf->instances[block_idx].mb;
 }
@@ -3048,7 +3059,8 @@ gk_flush_flow_table(const char *src_prefix,
 	struct gk_flush_request flush;
 
 	if (src_prefix == NULL && dst_prefix == NULL) {
-		G_LOG(ERR, "Failed to flush flow table: both source and destination prefixes are NULL\n");
+		G_LOG(ERR, "%s: failed to flush flow table: both source and destination prefixes are NULL\n",
+			__func__);
 		return -1;
 	}
 
@@ -3089,8 +3101,9 @@ gk_flush_flow_table(const char *src_prefix,
 			mb_alloc_entry(&gk_conf->instances[i].mb);
 		if (entry == NULL) {
 			G_LOG(WARNING,
-				"Cannot allocate an entry for the mailbox of the GK block at lcore %u to flush flows that match src_prefix=%s and dst_prefix=%s\n",
-				gk_conf->lcores[i], src_prefix, dst_prefix);
+				"%s(): cannot allocate an entry for the mailbox of the GK block at lcore %u to flush flows that match src_prefix=%s and dst_prefix=%s\n",
+				__func__, gk_conf->lcores[i],
+				src_prefix, dst_prefix);
 			continue;
 		}
 
@@ -3116,42 +3129,45 @@ gk_log_flow_state(const char *src_addr,
 	struct gk_cmd_entry *entry;
 
 	if (src_addr == NULL) {
-		G_LOG(ERR, "gk: failed to log flow state - source address is NULL\n");
+		G_LOG(ERR, "gk: %s(): failed to log flow state - source address is NULL\n",
+			__func__);
 		return -1;
 	}
 	if (dst_addr == NULL) {
-		G_LOG(ERR, "gk: failed to log flow state - destination address is NULL\n");
+		G_LOG(ERR, "gk: %s(): failed to log flow state - destination address is NULL\n",
+			__func__);
 		return -1;
 	}
 	if (gk_conf == NULL) {
-		G_LOG(ERR, "gk: failed to log flow state - gk_conf is NULL\n");
+		G_LOG(ERR, "gk: %s(): failed to log flow state - gk_conf is NULL\n",
+			__func__);
 		return -1;
 	}
 
 	ret = convert_str_to_ip(src_addr, &src);
 	if (ret < 0) {
-		G_LOG(ERR, "gk: failed to log flow state - source address (%s) is invalid\n",
-			src_addr);
+		G_LOG(ERR, "gk: %s(): failed to log flow state - source address (%s) is invalid\n",
+			__func__, src_addr);
 		return -1;
 	}
 
 	ret = convert_str_to_ip(dst_addr, &dst);
 	if (ret < 0) {
-		G_LOG(ERR, "gk: failed to log flow state - destination address (%s) is invalid\n",
-			dst_addr);
+		G_LOG(ERR, "gk: %s(): failed to log flow state - destination address (%s) is invalid\n",
+			__func__, dst_addr);
 		return -1;
 	}
 
 	if (unlikely(src.proto != dst.proto)) {
-		G_LOG(ERR, "gk: failed to log flow state - source (%s) and destination (%s) addresses don't have the same IP type\n",
-			src_addr, dst_addr);
+		G_LOG(ERR, "gk: %s(): failed to log flow state - source (%s) and destination (%s) addresses don't have the same IP type\n",
+			__func__, src_addr, dst_addr);
 		return -1;
 	}
 
 	if (unlikely(src.proto != RTE_ETHER_TYPE_IPV4 && src.proto !=
 			RTE_ETHER_TYPE_IPV6)) {
-		G_LOG(ERR, "gk: failed to log flow state - source (%s) and destination (%s) addresses don't have valid IP type %hu\n",
-			src_addr, dst_addr, src.proto);
+		G_LOG(ERR, "gk: %s(): failed to log flow state - source (%s) and destination (%s) addresses don't have valid IP type %hu\n",
+			__func__, src_addr, dst_addr, src.proto);
 		return -1;
 	}
 
@@ -3170,16 +3186,16 @@ gk_log_flow_state(const char *src_addr,
 
 	mb = get_responsible_gk_mailbox(flow_hash_val, gk_conf);
 	if (mb == NULL) {
-		G_LOG(ERR, "gk: failed to get responsible GK mailbox to log flow state that matches src_addr=%s and dst_addr=%s\n",
-			src_addr, dst_addr);
+		G_LOG(ERR, "gk: %s(): failed to get responsible GK mailbox to log flow state that matches src_addr=%s and dst_addr=%s\n",
+			__func__, src_addr, dst_addr);
 		return -1;
 	}
 
 	entry = mb_alloc_entry(mb);
 	if (entry == NULL) {
 		G_LOG(WARNING,
-			"gk: failed to allocate an entry for the mailbox of the GK block to log flow state that matches src_addr=%s and dst_addr=%s\n",
-			src_addr, dst_addr);
+			"gk: %s(): failed to allocate an entry for the mailbox of the GK block to log flow state that matches src_addr=%s and dst_addr=%s\n",
+			__func__, src_addr, dst_addr);
 		return -1;
 	}
 

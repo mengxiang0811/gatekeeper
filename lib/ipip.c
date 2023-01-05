@@ -56,7 +56,8 @@ encapsulate(struct rte_mbuf *pkt, uint8_t priority,
 		eth_hdr = adjust_pkt_len(pkt,
 			iface, sizeof(struct rte_ipv4_hdr));
 		if (eth_hdr == NULL) {
-			G_LOG(ERR, "ipip: could not adjust IPv4 packet length\n");
+			G_LOG(ERR, "ipip: %s(%s): could not adjust IPv4 packet length\n",
+				__func__, iface->name);
 			return -1;
 		}
 
@@ -88,7 +89,8 @@ encapsulate(struct rte_mbuf *pkt, uint8_t priority,
 		eth_hdr = adjust_pkt_len(pkt,
 			iface, sizeof(struct rte_ipv6_hdr));
 		if (eth_hdr == NULL) {
-			G_LOG(ERR, "ipip: could not adjust IPv6 packet length\n");
+			G_LOG(ERR, "ipip: %s(%s): could not adjust IPv6 packet length\n",
+				__func__, iface->name);
 			return -1;
 		}
 

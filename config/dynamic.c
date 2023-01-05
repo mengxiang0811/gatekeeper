@@ -79,14 +79,14 @@ write_nbytes(int conn_fd, const char *msg_buff, int nbytes)
 	 * the connection before getting a response.
 	 */
 	if (send_size == 0) {
-		G_LOG(WARNING, "Client disconnected\n");
+		G_LOG(WARNING, "%s(): client disconnected\n", __func__);
 		return -1;
 	}
 
 	if (send_size < 0) {
 		G_LOG(ERR,
-			"Failed to write data to the socket connection - (%s)\n",
-			strerror(errno));
+			"%s(): failed to write data to the socket connection (errno=%i)- (%s)\n",
+			__func__, errno, strerror(errno));
 		return -1;
 	}
 
@@ -125,7 +125,7 @@ process_client_message(int conn_fd,
 		"Dynamic configuration: the reply was NULL.";
 
 	if (msg_len == 0) {
-		G_LOG(WARNING, "The received message is an empty string\n");
+		G_LOG(WARNING, "%s(): the received message is an empty string\n", __func__);
 		return reply_client_message(conn_fd,
 			CLIENT_EMPTY_ERROR, strlen(CLIENT_EMPTY_ERROR));
 	}
@@ -143,7 +143,8 @@ process_client_message(int conn_fd,
 		RTE_VERIFY(ret == 0);
 
 		G_LOG(ERR,
-			"The client request script returns a NULL string\n");
+			"%s(): the client request script returns a NULL string\n",
+			__func__);
 		lua_pop(lua_state, 1);
 		return reply_client_message(conn_fd,
 			CLIENT_PROC_ERROR, strlen(CLIENT_PROC_ERROR));
@@ -151,8 +152,8 @@ process_client_message(int conn_fd,
 
 	if (reply_len > MSG_MAX_LEN) {
 		G_LOG(WARNING,
-			"The reply message length (%lu) exceeds the limit\n",
-			reply_len);
+			"%s(): the reply message length (%lu) exceeds the limit\n",
+			__func__, reply_len);
 		reply_len = MSG_MAX_LEN;
 	}
 
@@ -185,14 +186,14 @@ read_nbytes(int conn_fd, char *msg_buff, int nbytes)
 	 * message and then close the connection.
 	 */
 	if (recv_size == 0) {
-		G_LOG(DEBUG, "Client disconnected\n");
+		G_LOG(DEBUG, "%s(): client disconnected\n", __func__);
 		return -1;
 	}
 
 	if (recv_size < 0) {
 		G_LOG(ERR,
-			"Failed to read data from the socket connection - (%s)\n",
-			strerror(errno));
+			"%s(): Failed to read data from the socket connection (errno=%i) - (%s)\n",
+			__func__, errno, strerror(errno));
 		return -1;
 	}
 
@@ -255,8 +256,8 @@ cleanup_dy(struct dynamic_config *dy_conf)
 		ret = close(dy_conf->sock_fd);
 		if (ret < 0) {
 			G_LOG(ERR,
-				"Failed to close the server socket - (%s)\n",
-				strerror(errno));
+				"%s(): Failed to close the server socket (errno=%i) - (%s)\n",
+				__func__, errno, strerror(errno));
 		}
 		dy_conf->sock_fd = -1;
 	}
@@ -270,8 +271,9 @@ cleanup_dy(struct dynamic_config *dy_conf)
 	if (dy_conf->server_path != NULL) {
 		ret = unlink(dy_conf->server_path);
 		if (ret != 0) {
-			G_LOG(WARNING, "Failed to unlink(%s) - (%s)\n",
-				dy_conf->server_path, strerror(errno));
+			G_LOG(WARNING, "%s(): failed to unlink(%s) (errno=%i) - (%s)\n",
+				__func__, dy_conf->server_path,
+				errno, strerror(errno));
 		}
 
 		rte_free(dy_conf->server_path);
@@ -315,17 +317,19 @@ process_return_message(lua_State *l, struct dynamic_config *dy_conf,
 				case GT_UPDATE_POLICY_RETURN: {
 
 					if (dy_conf->gt == NULL) {
-						G_LOG(ERR, "The command operation %u requires that the server runs as Grantor\n",
-							entry->op);
+						G_LOG(ERR, "%s(): the command operation %u requires that the server runs as Grantor\n",
+							__func__, entry->op);
 						break;
 					}
 
-					if (unlikely(entry->u.gt.length > RETURN_MSG_MAX_LEN))
-						G_LOG(ERR, "The return message from GT block is too long\n");
-					else if (unlikely(reply_len + entry->u.gt.length >
-							MSG_MAX_LEN))
-						G_LOG(ERR, "The aggregated return message from GT blocks is too long\n");
-					else {
+					if (unlikely(entry->u.gt.length > RETURN_MSG_MAX_LEN)) {
+						G_LOG(ERR, "%s(): the return message from GT block is too long\n",
+							__func__);
+					} else if (unlikely(reply_len + entry->u.gt.length >
+							MSG_MAX_LEN)) {
+						G_LOG(ERR, "%s(): the aggregated return message from GT blocks is too long\n",
+							__func__);
+					} else {
 						rte_memcpy(reply_msg + reply_len,
 							entry->u.gt.return_msg,
 							entry->u.gt.length);
@@ -336,8 +340,8 @@ process_return_message(lua_State *l, struct dynamic_config *dy_conf,
 					break;
 				}
 				default:
-					G_LOG(ERR, "Unknown command operation %u\n",
-						entry->op);
+					G_LOG(ERR, "%s(): unknown command operation %u\n",
+						__func__, entry->op);
 					break;
 			}
 
@@ -514,8 +518,8 @@ handle_client(int server_socket_fd, struct dynamic_config *dy_conf)
 	conn_fd = accept(server_socket_fd,
 		(struct sockaddr *)&client_addr, &len);
 	if (conn_fd < 0) {
-		G_LOG(ERR, "Failed to accept a new connection - (%s)\n",
-			strerror(errno));
+		G_LOG(ERR, "%s(): failed to accept a new connection (errno=%i) - (%s)\n",
+			__func__, errno, strerror(errno));
 		return;
 	}
 
@@ -533,8 +537,8 @@ handle_client(int server_socket_fd, struct dynamic_config *dy_conf)
 	ret = setsockopt(conn_fd, SOL_SOCKET, SO_RCVTIMEO,
 		(const char*)&dy_conf->rcv_time_out, sizeof(struct timeval));
 	if (ret < 0) {
-		G_LOG(ERR, "Failed to call setsockopt(SO_RCVTIMEO) - (%s)\n",
-			strerror(errno));
+		G_LOG(ERR, "%s(): failed to call setsockopt(SO_RCVTIMEO) (errno=%i) - (%s)\n",
+			__func__, errno, strerror(errno));
 		goto close_fd;
 	}
 
@@ -543,21 +547,21 @@ handle_client(int server_socket_fd, struct dynamic_config *dy_conf)
 		SO_RCVBUF, &rcv_buff_size, sizeof(rcv_buff_size));
 	if (ret < 0) {
 		G_LOG(ERR,
-			"Failed to call setsockopt(SO_RCVBUF) with size = %d - (%s)\n",
-			rcv_buff_size, strerror(errno));
+			"%s(): failed to call setsockopt(SO_RCVBUF) with size = %d (errno=%i) - (%s)\n",
+			__func__, rcv_buff_size, errno, strerror(errno));
 		goto close_fd;
 	}
 
 	lua_state = luaL_newstate();
 	if (lua_state == NULL) {
-		G_LOG(ERR, "Failed to create new Lua state\n");
+		G_LOG(ERR, "%s(): failed to create new Lua state\n", __func__);
 		goto close_fd;
 	}
 
 	/* Set up the Lua state while there is a connection. */
 	ret = setup_dy_lua(lua_state, dy_conf);
 	if (ret < 0) {
-		G_LOG(ERR, "Failed to set up the lua state\n");
+		G_LOG(ERR, "%s(): failed to set up the lua state\n", __func__);
 		goto close_lua;
 	}
 
@@ -573,8 +577,8 @@ close_lua:
 close_fd:
 	ret = close(conn_fd);
 	if (ret < 0) {
-		G_LOG(ERR, "Failed to close the connection socket - (%s)\n",
-			strerror(errno));
+		G_LOG(ERR, "%s(): failed to close the connection socket (errno=%i) - (%s)\n",
+			__func__, errno, strerror(errno));
 	}
 }
 
@@ -656,12 +660,14 @@ dyn_cfg_proc(void *arg)
 		 */
 		cap_value_t caps[] = {CAP_DAC_OVERRIDE, CAP_SYS_ADMIN};
 		if (needed_caps(RTE_DIM(caps), caps) < 0) {
-			G_LOG(ERR, "Could not set needed capabilities for Grantor\n");
+			G_LOG(ERR, "%s(): could not set needed capabilities for Grantor\n",
+				__func__);
 			exiting = true;
 		}
 	} else {
 		if (needed_caps(0, NULL) < 0) {
-			G_LOG(ERR, "Could not set needed capabilities\n");
+			G_LOG(ERR, "%s(): could not set needed capabilities\n",
+				__func__);
 			exiting = true;
 		}
 	}
@@ -687,8 +693,8 @@ dyn_cfg_proc(void *arg)
 		ret = select(dy_conf->sock_fd + 1, &fds, NULL, NULL, &stv);
 		if (ret < 0 && errno != EINTR) {
 			G_LOG(ERR,
-				"Failed to call the select() function - (%s)\n",
-				strerror(errno));
+				"%s(): failed to call the select() function (errno=%i) - (%s)\n",
+				__func__, errno, strerror(errno));
 			break;
 		} else if (likely(ret <= 0)) {
 			if (unlikely(ret < 0))

@@ -48,9 +48,9 @@ print_invalid_flow_err_msg(const struct ip_flow *flow, const char *index_str,
 	RTE_BUILD_BUG_ON(sizeof(flow->f.v6.src) != 16);
 	RTE_BUILD_BUG_ON(sizeof(flow->f.v6.dst) != 16);
 
-	G_LOG(ERR, "INVALID Flow {proto = %i, f.v6.src = 0x%016"PRIx64
+	G_LOG(ERR, "%s(): INVALID Flow {proto = %i, f.v6.src = 0x%016"PRIx64
 		"%016"PRIx64", f.v6.dst = 0x%016"PRIx64"%016"PRIx64"}%s: %s\n",
-		flow->proto,
+		__func__, flow->proto,
 		rte_be_to_cpu_64(src[0]), rte_be_to_cpu_64(src[1]),
 		rte_be_to_cpu_64(dst[0]), rte_be_to_cpu_64(dst[1]),
 		index_str, err_msg);
@@ -120,6 +120,6 @@ print_flow_err_msg(const struct ip_flow *flow, int32_t index,
 		return print_invalid_flow_err_msg(flow, index_str, err_msg);
 	}
 
-	G_LOG(ERR, "Flow (src: %s, dst: %s)%s: %s\n", src, dst,
-		index_str, err_msg);
+	G_LOG(ERR, "%s(): flow (src: %s, dst: %s)%s: %s\n", src, dst,
+		__func__, index_str, err_msg);
 }

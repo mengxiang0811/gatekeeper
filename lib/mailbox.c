@@ -44,8 +44,8 @@ init_mailbox(const char *tag, int mailbox_max_entries_exp,
 		socket_id, RING_F_SC_DEQ);
 	if (mb->ring == NULL) {
 		G_LOG(ERR,
-			"mailbox: can't create ring %s (len = %d) at lcore %u\n",
-			ring_name, ret, lcore_id);
+			"%s(): mailbox: can't create ring %s (len = %d) at lcore %u (errno=%i) - %s\n",
+			__func__, ring_name, ret, lcore_id, rte_errno, rte_strerror(rte_errno));
 		ret = -1;
 		goto out;
 	}
@@ -59,8 +59,8 @@ init_mailbox(const char *tag, int mailbox_max_entries_exp,
 		cache_size, 0, NULL, NULL, NULL, NULL, socket_id, 0);
 	if (mb->pool == NULL) {
 		G_LOG(ERR,
-			"mailbox: can't create mempool %s (len = %d) at lcore %u\n",
-			pool_name, ret, lcore_id);
+			"%s(): mailbox: can't create mempool %s (len = %d) at lcore %u (errno=%i) - %s\n",
+			__func__, pool_name, ret, lcore_id, rte_errno, rte_strerror(rte_errno));
 		ret = -1;
 		goto free_ring;
 	}
@@ -80,8 +80,8 @@ mb_alloc_entry(struct mailbox *mb)
 	void *obj = NULL;
 	int ret = rte_mempool_get(mb->pool, &obj);
 	if (ret < 0) {
-		G_LOG(ERR, "mailbox: failed to get a new entry from the mempool - %s\n",
-			rte_strerror(-ret));
+		G_LOG(ERR, "%s(): mailbox: failed to get a new entry from the mempool (errno=%i) - %s\n",
+			__func__, -ret, rte_strerror(-ret));
 		return NULL;
 	}
 
@@ -96,11 +96,13 @@ mb_send_entry(struct mailbox *mb, void *obj)
 	int ret = rte_ring_mp_enqueue(mb->ring, obj);
 	if (ret == -EDQUOT) {
 		G_LOG(WARNING,
-			"mailbox: high water mark exceeded; the object has been enqueued\n");
+			"%s(): mailbox: high water mark exceeded; the object has been enqueued (errno=%i) - %s\n",
+			__func__, -ret, rte_strerror(-ret));
 		ret = 0;
 	} else if (ret == -ENOBUFS) {
 		G_LOG(ERR,
-			"mailbox: quota exceeded; not enough room in the ring to enqueue\n");
+			"%s(): mailbox: quota exceeded; not enough room in the ring to enqueue (errno=%i) - %s\n",
+			__func__, -ret, rte_strerror(-ret));
 		mb_free_entry(mb, obj);
 	} else
 		RTE_VERIFY(ret == 0);

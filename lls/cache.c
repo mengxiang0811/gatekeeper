@@ -63,17 +63,18 @@ lls_cache_dump(struct lls_cache *cache)
 		int ret = convert_ip_to_str(&map->addr, ip_str,
 			sizeof(ip_str));
 		if (unlikely(ret < 0)) {
-			G_LOG(DEBUG, "Couldn't convert cache record's IP address to string\n");
+			G_LOG(DEBUG, "%s(): couldn't convert cache record's IP address to string\n",
+				__func__);
 			goto next;
 		}
 
 		if (map->stale) {
-			G_LOG(DEBUG, "%s: unresolved (%u holds)\n",
-				ip_str, record->num_holds);
+			G_LOG(DEBUG, "%s(%s): unresolved (%u holds)\n",
+				__func__, ip_str, record->num_holds);
 		} else {
 			G_LOG(DEBUG,
-				"%s: %02"PRIx8":%02"PRIx8":%02"PRIx8":%02"PRIx8":%02"PRIx8":%02"PRIx8" (port %hhu) (%u holds)\n",
-				ip_str,
+				"%s(%s): %02"PRIx8":%02"PRIx8":%02"PRIx8":%02"PRIx8":%02"PRIx8":%02"PRIx8" (port %hhu) (%u holds)\n",
+				__func__, ip_str,
 				map->ha.addr_bytes[0], map->ha.addr_bytes[1],
 				map->ha.addr_bytes[2], map->ha.addr_bytes[3],
 				map->ha.addr_bytes[4], map->ha.addr_bytes[5],
@@ -119,8 +120,8 @@ lls_add_record(struct lls_cache *cache, const struct ipaddr *addr)
 	if (unlikely(ret == -EINVAL || ret == -ENOSPC)) {
 		char ip_str[MAX_INET_ADDRSTRLEN];
 		int ret2 = convert_ip_to_str(addr, ip_str, sizeof(ip_str));
-		G_LOG(ERR, "%s, could not add record for %s\n",
-			ret == -EINVAL ? "Invalid params" : "No space",
+		G_LOG(ERR, "%s(): %s, could not add record for %s\n",
+			__func__, ret == -EINVAL ? "Invalid params" : "No space",
 			ret2 < 0 ? cache->name : ip_str);
 	} else
 		RTE_VERIFY(ret >= 0);
@@ -134,8 +135,8 @@ lls_del_record(struct lls_cache *cache, const struct ipaddr *addr)
 	if (unlikely(ret == -ENOENT || ret == -EINVAL)) {
 		char ip_str[MAX_INET_ADDRSTRLEN];
 		int ret2 = convert_ip_to_str(addr, ip_str, sizeof(ip_str));
-		G_LOG(ERR, "%s, record for %s not deleted\n",
-			ret == -ENOENT ? "No map found" : "Invalid params",
+		G_LOG(ERR, "%s(): %s, record for %s not deleted\n",
+			__func__, ret == -ENOENT ? "No map found" : "Invalid params",
 			ret2 < 0 ? cache->name : ip_str);
 	}
 }
@@ -171,8 +172,8 @@ lls_process_hold(struct lls_config *lls_conf, struct lls_hold_req *hold_req)
 		ret = convert_ip_to_str(&hold_req->addr, ip_str,
 			sizeof(ip_str));
 		G_LOG(ERR,
-			"Invalid params, could not get %s map; hold failed\n",
-			ret < 0 ? cache->name : ip_str);
+			"%s(): invalid params, could not get %s map; hold failed\n",
+			__func__, ret < 0 ? cache->name : ip_str);
 		return;
 	}
 
@@ -213,8 +214,8 @@ lls_process_put(struct lls_config *lls_conf, struct lls_put_req *put_req)
 		ret = convert_ip_to_str(&put_req->addr, ip_str,
 			sizeof(ip_str));
 		G_LOG(ERR,
-			"Invalid params, could not get %s map; put failed\n",
-			ret < 0 ? cache->name : ip_str);
+			"%s(): invalid params, could not get %s map; put failed\n",
+			__func__, ret < 0 ? cache->name : ip_str);
 		return;
 	}
 
@@ -286,8 +287,8 @@ lls_process_mod(struct lls_config *lls_conf, struct lls_mod_req *mod_req)
 		ret = convert_ip_to_str(&mod_req->addr, ip_str,
 			sizeof(ip_str));
 		G_LOG(ERR,
-			"Invalid params, could not get %s map; mod failed\n",
-			ret < 0 ? cache->name : ip_str);
+			"%s(): invalid params, could not get %s map; mod failed\n",
+			__func__, ret < 0 ? cache->name : ip_str);
 		return;
 	}
 
@@ -413,8 +414,8 @@ process_icmp_pkts(struct lls_config *lls_conf, struct lls_icmp_req *icmp)
 				src_ip_or_err =
 					"(could not convert IP to string)";
 
-			G_LOG(ERR, "Received \"Fragmentation required, and DF flag set\" ICMP packet on the %s interface from source IP %s; check MTU along path\n",
-				icmp->iface->name, src_ip_or_err);
+			G_LOG(ERR, "%s(): received \"Fragmentation required, and DF flag set\" ICMP packet on the %s interface from source IP %s; check MTU along path\n",
+				__func__, icmp->iface->name, src_ip_or_err);
 		}
 
 		kni_pkts[num_kni_pkts++] = pkt;
@@ -490,8 +491,8 @@ process_icmp6_pkts(struct lls_config *lls_conf, struct lls_icmp6_req *icmp6)
 				src_ip_or_err =
 					"(could not convert IP to string)";
 
-			G_LOG(ERR, "Received \"Packet Too Big\" ICMPv6 packet on %s interface from source IP %s; check MTU along path\n",
-				icmp6->iface->name, src_ip_or_err);
+			G_LOG(ERR, "%s(): received \"Packet Too Big\" ICMPv6 packet on %s interface from source IP %s; check MTU along path\n",
+				__func__, icmp6->iface->name, src_ip_or_err);
 		}
 
 		kni_pkts[num_kni_pkts++] = pkt;
@@ -550,8 +551,8 @@ lls_process_reqs(struct lls_config *lls_conf)
 			process_icmp6_pkts(lls_conf, &reqs[i]->u.icmp6);
 			break;
 		default:
-			G_LOG(ERR, "Unrecognized request type (%d)\n",
-				reqs[i]->ty);
+			G_LOG(ERR, "%s(): unrecognized request type (%d)\n",
+				__func__, reqs[i]->ty);
 			break;
 		}
 		mb_free_entry(&lls_conf->requests, reqs[i]);
@@ -568,7 +569,8 @@ lls_req(enum lls_req_ty ty, void *req_arg)
 	int ret;
 
 	if (req == NULL) {
-		G_LOG(ERR, "Allocation for request of type %d failed", ty);
+		G_LOG(ERR, "%s(): allocation for request of type %d failed",
+			__func__, ty);
 		return -1;
 	}
 
@@ -606,7 +608,8 @@ lls_req(enum lls_req_ty ty, void *req_arg)
 	}
 	default:
 		mb_free_entry(&lls_conf->requests, req);
-		G_LOG(ERR, "Unknown request type %d failed", ty);
+		G_LOG(ERR, "%s(): unknown request type %d failed",
+			__func__, ty);
 		return -1;
 	}
 
@@ -665,8 +668,8 @@ lls_cache_scan(struct lls_config *lls_conf, struct lls_cache *cache)
 			char ip_str[MAX_INET_ADDRSTRLEN];
 			int ret = convert_ip_to_str(addr, ip_str,
 				sizeof(ip_str));
-			G_LOG(ERR, "Map for %s has an invalid port %hhu\n",
-				ret < 0 ? cache->name : ip_str,
+			G_LOG(ERR, "%s(): map for %s has an invalid port %hhu\n",
+				__func__, ret < 0 ? cache->name : ip_str,
 				record->map.port_id);
 			lls_del_record(cache, addr);
 			goto next;
@@ -733,14 +736,15 @@ lls_cache_init(struct lls_config *lls_conf, struct lls_cache *cache,
 		lls_conf->max_num_cache_records, sizeof(*cache->records), 0,
 		socket_id);
 	if (cache->records == NULL) {
-		G_LOG(ERR, "Could not allocate %s cache records\n",
-			cache->name);
+		G_LOG(ERR, "%s(): could not allocate %s cache records\n",
+			__func__, cache->name);
 		return -1;
 	}
 
 	cache->hash = rte_hash_create(&lls_cache_params);
 	if (cache->hash == NULL) {
-		G_LOG(ERR, "Could not create %s cache hash\n", cache->name);
+		G_LOG(ERR, "%s(): could not create %s cache hash\n",
+			__func__, cache->name);
 		goto records;
 	}
 	return 0;
